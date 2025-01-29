@@ -1,14 +1,20 @@
-# Compiler files
+# Ignore foundry artifacts & cache
 cache/
 out/
+
+# Ignore all dotfiles except the whitelisted ones
+.*
+!.env.example
+!.envrc
+!.github
+!.gitignore
+!.gitattributes
+!.solhint.json
+!.solhintignore
+!.vscode
+!.editorconfig
 
 # Ignores development broadcast logs
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
-
-# Docs
-docs/
-
-# Dotenv file
-.env
