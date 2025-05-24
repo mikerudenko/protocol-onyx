@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-3.0
+
+/*
+    This file is part of the Enzyme Protocol.
+
+    (c) Enzyme Foundation <foundation@enzyme.finance>
+
+    For the full license information, please view the LICENSE
+    file that was distributed with this source code.
+*/
+
+pragma solidity 0.8.28;
+
+import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
+import {Shares} from "src/shares/Shares.sol";
+
+/// @title FeeTrackerHelpersMixin Contract
+/// @author Enzyme Foundation <security@enzyme.finance>
+/// @notice Mixin of helpers for fee tracker implementations
+abstract contract FeeTrackerHelpersMixin is ComponentHelpersMixin {
+    error FeeTrackerHelpersMixin__OnlyFeeManager__Unauthorized();
+
+    modifier onlyFeeManager() {
+        require(
+            msg.sender == Shares(__getShares()).getFeeManager(), FeeTrackerHelpersMixin__OnlyFeeManager__Unauthorized()
+        );
+
+        _;
+    }
+}
