@@ -11,9 +11,9 @@
 
 pragma solidity ^0.8.0;
 
-import {LinearCreditDebtTracker} from "src/components/value/position-trackers/LinearCreditDebtTracker.sol";
+import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 import {ComponentHarnessMixin} from "test/harnesses/utils/ComponentHarnessMixin.sol";
 
-contract LinearCreditDebtTrackerHarness is LinearCreditDebtTracker, ComponentHarnessMixin {
+contract ShareValueHandlerHarness is ShareValueHandler, ComponentHarnessMixin {
     constructor(address _shares) ComponentHarnessMixin(_shares) {}
 }

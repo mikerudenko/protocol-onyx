@@ -11,7 +11,7 @@
 
 pragma solidity 0.8.28;
 
-import {IPositionTracker} from "src/interfaces/IPositionTracker.sol";
+import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 

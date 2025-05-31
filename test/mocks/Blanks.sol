@@ -16,8 +16,8 @@ pragma solidity ^0.8.0;
 
 import {IManagementFeeTracker} from "src/components/fees/interfaces/IManagementFeeTracker.sol";
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
+import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
-import {IPositionTracker} from "src/interfaces/IPositionTracker.sol";
 
 contract BlankFeeManager is IFeeManager {
     function getTotalValueOwed() external view returns (uint256 totalValueOwed_) {}

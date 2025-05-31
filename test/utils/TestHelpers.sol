@@ -14,7 +14,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
-import {IPositionTracker} from "src/interfaces/IPositionTracker.sol";
+import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
+import {IShareValueHandler} from "src/interfaces/IShareValueHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
 import {BlankFeeManager, BlankPositionTracker} from "test/mocks/Blanks.sol";
@@ -48,8 +49,10 @@ contract TestHelpers is Test {
         vm.mockCall(_positionTracker, IPositionTracker.getPositionValue.selector, abi.encode(_value));
     }
 
-    function shares_mockGetLastShareValue(address _shares, uint256 _shareValue, uint256 _timestamp) internal {
-        vm.mockCall(_shares, Shares.getLastShareValue.selector, abi.encode(_shareValue, _timestamp));
+    function shareValueHandler_mockGetShareValue(address _shareValueHandler, uint256 _shareValue, uint256 _timestamp)
+        internal
+    {
+        vm.mockCall(_shareValueHandler, IShareValueHandler.getShareValue.selector, abi.encode(_shareValue, _timestamp));
     }
 
     function shares_mockSharePrice(address _shares, uint256 _sharePrice, uint256 _timestamp) internal {
@@ -65,22 +68,6 @@ contract TestHelpers is Test {
         Shares(_shares).setFeeManager(feeManager_);
 
         feeManager_mockGetTotalValueOwed({_feeManager: feeManager_, _totalValueOwed: _totalValueOwed});
-    }
-
-    function setMockPositionTrackers(address _shares, int256[] memory _trackedValues)
-        internal
-        returns (address[] memory positionTrackers_)
-    {
-        positionTrackers_ = new address[](_trackedValues.length);
-
-        for (uint256 i = 0; i < _trackedValues.length; i++) {
-            positionTrackers_[i] = address(new BlankPositionTracker());
-
-            positionTracker_mockGetPositionValue({_positionTracker: positionTrackers_[i], _value: _trackedValues[i]});
-        }
-
-        vm.prank(Shares(_shares).owner());
-        Shares(_shares).setPositionTrackers(positionTrackers_);
     }
 
     // MISC

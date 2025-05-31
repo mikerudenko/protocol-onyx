@@ -13,7 +13,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {LinearCreditDebtTracker} from "src/components/position-trackers/LinearCreditDebtTracker.sol";
+import {LinearCreditDebtTracker} from "src/components/value/position-trackers/LinearCreditDebtTracker.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {Shares} from "src/shares/Shares.sol";
 

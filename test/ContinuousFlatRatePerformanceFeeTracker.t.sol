@@ -132,6 +132,7 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
 
     function test_settlePerformanceFee_success_belowHwm() public {
         // Give initial HWM of 1e18
+        shares_mockSharePrice({_shares: address(shares), _sharePrice: DEFAULT_SHARE_PRICE, _timestamp: block.timestamp});
         vm.prank(admin);
         performanceFeeTracker.resetHighWaterMark();
         uint256 initialHwm = performanceFeeTracker.getHighWaterMark();
@@ -155,6 +156,7 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
 
     function test_settlePerformanceFee_success_aboveHwm() public {
         // Give initial HWM of 1e18
+        shares_mockSharePrice({_shares: address(shares), _sharePrice: DEFAULT_SHARE_PRICE, _timestamp: block.timestamp});
         vm.prank(admin);
         performanceFeeTracker.resetHighWaterMark();
         uint256 initialHwm = performanceFeeTracker.getHighWaterMark();

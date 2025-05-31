@@ -13,11 +13,10 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
-import {IPositionTracker} from "src/interfaces/IPositionTracker.sol";
+import {IShareValueHandler} from "src/interfaces/IShareValueHandler.sol";
 import {DEFAULT_SHARE_PRICE} from "src/utils/Constants.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
@@ -30,7 +29,6 @@ import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
 ///   - a very low totalSupply() (e.g., "inflation attack")
 ///   - a very low share value
 contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
-    using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
     //==================================================================================================================
@@ -41,11 +39,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         None,
         RestrictedNoTransfers,
         RestrictedWithTransfers
-    }
-
-    struct ShareValue {
-        uint192 value;
-        uint64 timestamp;
     }
 
     //==================================================================================================================
@@ -62,12 +55,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         address redeemAssetsSrc;
         address feeAssetsSrc;
         address feeManager;
-        address[] positionTrackers;
+        address shareValueHandler;
         mapping(address => bool) isDepositHandler;
         mapping(address => bool) isRedeemHandler;
         mapping(address => bool) isAdmin;
         mapping(address => bool) isAllowedHolder;
-        ShareValue lastShareValue;
     }
 
     function __getSharesStorage() private view returns (SharesStorage storage $) {
@@ -103,15 +95,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event HolderRestrictionSet(HolderRestriction holderRestriction);
 
-    event PositionTrackersSet(address[] positionTrackers);
-
     event RedeemHandlerAdded(address queue);
 
     event RedeemHandlerRemoved(address queue);
 
-    event ShareValueUpdated(
-        uint256 netShareValue, int256 trackedPositionsValue, int256 untrackedPositionsValue, uint256 totalFeesOwed
-    );
+    event ShareValueHandlerSet(address shareValueHandler);
 
     event ValueAssetSet(bytes32 valueAsset);
 
@@ -157,7 +145,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     error Shares__SetValueAsset__Empty();
 
-    error Shares__UpdateShareValue__NegativeTotalPositionsValue(int256 value);
+    error Shares__SettleDynamicFees__Unauthorized();
 
     error Shares__ValidateDepositRecipient__NotAllowed();
 
@@ -343,11 +331,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         emit FeeManagerSet(_feeManager);
     }
 
-    function setPositionTrackers(address[] calldata _positionTrackers) external onlyAdminOrOwner {
+    function setShareValueHandler(address _shareValueHandler) external onlyAdminOrOwner {
         SharesStorage storage $ = __getSharesStorage();
-        $.positionTrackers = _positionTrackers;
+        $.shareValueHandler = _shareValueHandler;
 
-        emit PositionTrackersSet(_positionTrackers);
+        emit ShareValueHandlerSet(_shareValueHandler);
     }
 
     // SHARES HOLDING
@@ -393,85 +381,10 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     //==================================================================================================================
 
     function sharePrice() external view returns (uint256 price_, uint256 timestamp_) {
-        (price_, timestamp_) = getLastShareValue();
+        uint256 value;
+        (value, timestamp_) = IShareValueHandler(getShareValueHandler()).getShareValue();
 
-        if (price_ == 0) {
-            price_ = DEFAULT_SHARE_PRICE;
-        }
-    }
-
-    /// @dev If no shares exist:
-    /// - logic still runs
-    /// - FeeManager is still called to settle fees
-    /// - lastShareValue is set to 0
-    /// Reverts if:
-    /// - totalPositionsValue < 0
-    /// - totalPositionsValue < totalFeesOwed
-    /// If using dynamic fees, call this prior to initial deposits to checkpoint initial state
-    function updateShareValue(int256 _untrackedPositionsValue)
-        external
-        onlyAdminOrOwner
-        returns (uint256 netShareValue_)
-    {
-        // Sum tracked positions
-        int256 trackedPositionsValue;
-        address[] memory positionTrackers = getPositionTrackers();
-        for (uint256 i; i < positionTrackers.length; i++) {
-            trackedPositionsValue += IPositionTracker(positionTrackers[i]).getPositionValue();
-        }
-
-        // Sum tracked + untracked positions
-        uint256 totalPositionsValue;
-        {
-            int256 totalPositionsValueInt = trackedPositionsValue + _untrackedPositionsValue;
-            require(
-                totalPositionsValueInt >= 0,
-                Shares__UpdateShareValue__NegativeTotalPositionsValue(totalPositionsValueInt)
-            );
-            totalPositionsValue = uint256(totalPositionsValueInt);
-        }
-
-        // Settle dynamic fees and get total fees owed
-        uint256 totalFeesOwed;
-        if (getFeeManager() != address(0)) {
-            IFeeManager(getFeeManager()).settleDynamicFees({_totalPositionsValue: totalPositionsValue});
-
-            totalFeesOwed = IFeeManager(getFeeManager()).getTotalValueOwed();
-        }
-
-        // Calculate net share value (inclusive of total fees owed)
-        uint256 sharesSupply = totalSupply();
-        if (sharesSupply > 0) {
-            netShareValue_ = ValueHelpersLib.calcValuePerShare({
-                _totalValue: totalPositionsValue - totalFeesOwed,
-                _totalSharesAmount: sharesSupply
-            });
-        }
-        // else: no shares, netShareValue_ = 0
-
-        __updateShareValue({
-            _netShareValue: netShareValue_,
-            _trackedPositionsValue: trackedPositionsValue,
-            _untrackedPositionsValue: _untrackedPositionsValue,
-            _totalFeesOwed: totalFeesOwed
-        });
-    }
-
-    function __updateShareValue(
-        uint256 _netShareValue,
-        int256 _trackedPositionsValue,
-        int256 _untrackedPositionsValue,
-        uint256 _totalFeesOwed
-    ) internal {
-        SharesStorage storage $ = __getSharesStorage();
-        $.lastShareValue = ShareValue({value: _netShareValue.toUint192(), timestamp: uint64(block.timestamp)});
-
-        emit ShareValueUpdated({
-            netShareValue: _netShareValue,
-            trackedPositionsValue: _trackedPositionsValue,
-            untrackedPositionsValue: _untrackedPositionsValue,
-            totalFeesOwed: _totalFeesOwed
-        });
+        price_ = value > 0 ? value : DEFAULT_SHARE_PRICE;
     }
 
     //==================================================================================================================
@@ -587,17 +500,12 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         return __getSharesStorage().holderRestriction;
     }
 
-    function getLastShareValue() public view returns (uint256 value_, uint256 timestamp_) {
-        ShareValue memory lastShareValue = __getSharesStorage().lastShareValue;
-        return (lastShareValue.value, lastShareValue.timestamp);
-    }
-
-    function getPositionTrackers() public view returns (address[] memory) {
-        return __getSharesStorage().positionTrackers;
-    }
-
     function getRedeemAssetsSrc() public view returns (address) {
         return __getSharesStorage().redeemAssetsSrc;
+    }
+
+    function getShareValueHandler() public view returns (address) {
+        return __getSharesStorage().shareValueHandler;
     }
 
     function getValueAsset() public view returns (bytes32) {

@@ -446,27 +446,26 @@ contract SharesTest is Test, TestHelpers {
         assertEq(shares.getFeeManager(), newFeeManager);
     }
 
-    function test_setPositionTrackers_fail_unauthorized() public {
+    function test_setShareValueHandler_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
+        address newShareValueHandler = makeAddr("newShareValueHandler");
 
         vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shares.setPositionTrackers(new address[](0));
+        shares.setShareValueHandler(newShareValueHandler);
     }
 
-    function test_setPositionTrackers_success() public {
-        address[] memory newPositionTrackers = new address[](2);
-        newPositionTrackers[0] = makeAddr("newPositionTracker1");
-        newPositionTrackers[1] = makeAddr("newPositionTracker2");
+    function test_setShareValueHandler_success() public {
+        address newShareValueHandler = makeAddr("newShareValueHandler");
 
         vm.expectEmit(address(shares));
-        emit Shares.PositionTrackersSet(newPositionTrackers);
+        emit Shares.ShareValueHandlerSet(newShareValueHandler);
 
         vm.prank(admin);
-        shares.setPositionTrackers(newPositionTrackers);
+        shares.setShareValueHandler(newShareValueHandler);
 
-        assertEq(shares.getPositionTrackers(), newPositionTrackers);
+        assertEq(shares.getShareValueHandler(), newShareValueHandler);
     }
 
     // SHARES HOLDING
@@ -560,6 +559,38 @@ contract SharesTest is Test, TestHelpers {
         shares.setHolderRestriction(newRestriction);
 
         assertEq(uint8(shares.getHolderRestriction()), uint8(newRestriction));
+    }
+
+    //==================================================================================================================
+    // Valuation
+    //==================================================================================================================
+
+    function test_sharePrice_success_nonZeroValue() public {
+        __test_sharePrice_success({_shareValue: 123, _expectedSharePrice: 123, _valueTimestamp: 456});
+    }
+
+    function test_sharePrice_success_zeroValue() public {
+        __test_sharePrice_success({_shareValue: 0, _expectedSharePrice: 1e18, _valueTimestamp: 123});
+    }
+
+    function __test_sharePrice_success(uint256 _shareValue, uint256 _expectedSharePrice, uint256 _valueTimestamp)
+        public
+    {
+        // Set share value handler
+        address shareValueHandler = makeAddr("shareValueHandler");
+        vm.prank(admin);
+        shares.setShareValueHandler(shareValueHandler);
+
+        shareValueHandler_mockGetShareValue({
+            _shareValueHandler: shareValueHandler,
+            _shareValue: _shareValue,
+            _timestamp: _valueTimestamp
+        });
+
+        (uint256 price, uint256 timestamp) = shares.sharePrice();
+
+        assertEq(price, _expectedSharePrice);
+        assertEq(timestamp, _valueTimestamp);
     }
 
     //==================================================================================================================
@@ -1027,196 +1058,5 @@ contract SharesTest is Test, TestHelpers {
 
         assertEq(mockToken.balanceOf(feeAssetsSrc), srcInitialBalance - amount);
         assertEq(mockToken.balanceOf(to), amount);
-    }
-
-    //==================================================================================================================
-    // Valuation
-    //==================================================================================================================
-
-    function test_sharePrice_success_initialValue() public {
-        uint256 expectedTimestamp = 123;
-        vm.warp(expectedTimestamp);
-
-        (uint256 price, uint256 timestamp) = shares.sharePrice();
-
-        // 1 value unit (1e18) and no timestamp
-        assertEq(price, 1e18);
-        assertEq(timestamp, 0);
-    }
-
-    function test_sharePrice_success_zeroValue() public {
-        uint256 updateTimestamp = 123;
-        vm.warp(updateTimestamp);
-
-        vm.prank(owner);
-        shares.updateShareValue(0);
-
-        // Warp to some other time for the query
-        vm.warp(456);
-
-        (uint256 price, uint256 timestamp) = shares.sharePrice();
-
-        // 1 value unit (1e18) and the timestamp at update
-        assertEq(price, 1e18);
-        assertEq(timestamp, updateTimestamp);
-    }
-
-    function test_sharePrice_success_nonZeroValue() public {
-        // Target price: 3e18 (i.e., 3 value units per share)
-        uint256 expectedPrice = 3e18;
-        uint256 sharesSupply = 9e6;
-        uint256 value = sharesSupply * 3;
-
-        // Mint some shares to create a price
-        address mintTo = makeAddr("mintTo");
-        deal({token: address(shares), to: mintTo, give: sharesSupply, adjust: true});
-        assertEq(shares.totalSupply(), sharesSupply);
-
-        uint256 updateTimestamp = 123;
-        vm.warp(updateTimestamp);
-
-        vm.prank(owner);
-        shares.updateShareValue(int256(value));
-
-        // Warp to some other time for the query
-        vm.warp(456);
-
-        (uint256 price, uint256 timestamp) = shares.sharePrice();
-
-        assertEq(price, expectedPrice);
-        assertEq(timestamp, updateTimestamp);
-    }
-
-    // TODO:
-    // - negative tracked positions value
-    // - negative untracked positions value
-    // - other combos
-
-    function test_updateShareValue_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.updateShareValue(0);
-    }
-
-    function test_updateShareValue_success_noShares() public {
-        __test_updateShareValue_success({
-            _totalShares: 0,
-            _untrackedValue: 0,
-            _positionTrackerValues: new int256[](0),
-            _hasFeeManager: true,
-            _feesOwed: 0,
-            _expectedValuePerShare: 0
-        });
-    }
-
-    function test_updateShareValue_success_onlyUntrackedValue_noFeeManager() public {
-        // Target price: 3e18 (i.e., 3 value units per share)
-        uint256 expectedValuePerShare = 3e18;
-        uint256 totalShares = 9e6;
-        int256 untrackedValue = int256(totalShares) * 3;
-
-        __test_updateShareValue_success({
-            _totalShares: totalShares,
-            _untrackedValue: untrackedValue,
-            _positionTrackerValues: new int256[](0),
-            _hasFeeManager: false,
-            _feesOwed: 0,
-            _expectedValuePerShare: expectedValuePerShare
-        });
-    }
-
-    function test_updateShareValue_success_all() public {
-        // Target price: 3e18 (i.e., 3 value units per share)
-        uint256 expectedValuePerShare = 3e18;
-        uint256 totalShares = 9e6;
-        int256 value = int256(totalShares) * 3;
-
-        // Split into tracked, untracked, and fees owed
-        int256 trackedPositionsValue = value / 11;
-        uint256 feesOwed = uint256(trackedPositionsValue) / 3;
-        // Add feesOwed to untracked value to offset the fees
-        int256 untrackedValue = value - trackedPositionsValue + int256(feesOwed);
-
-        // Create two position trackers for untrackedPositionsValue
-        int256[] memory positionTrackerValues = new int256[](2);
-        positionTrackerValues[0] = trackedPositionsValue / 6;
-        positionTrackerValues[1] = trackedPositionsValue - positionTrackerValues[0];
-
-        __test_updateShareValue_success({
-            _totalShares: totalShares,
-            _untrackedValue: untrackedValue,
-            _positionTrackerValues: positionTrackerValues,
-            _hasFeeManager: true,
-            _feesOwed: feesOwed,
-            _expectedValuePerShare: expectedValuePerShare
-        });
-    }
-
-    function __test_updateShareValue_success(
-        uint256 _totalShares,
-        int256 _untrackedValue,
-        int256[] memory _positionTrackerValues,
-        bool _hasFeeManager,
-        uint256 _feesOwed,
-        uint256 _expectedValuePerShare
-    ) internal {
-        // Validate that if there are fees owed, there is also a FeeManager
-        assertTrue(_hasFeeManager || (!_hasFeeManager && _feesOwed == 0), "fees owed but no FeeManager");
-
-        // Add FeeManager if needed
-        address feeManager;
-        if (_hasFeeManager) {
-            feeManager = setMockFeeManager({_shares: address(shares), _totalValueOwed: _feesOwed});
-        }
-
-        // Add position trackers if needed
-        int256 trackedPositionsValue;
-        if (_positionTrackerValues.length > 0) {
-            setMockPositionTrackers({_shares: address(shares), _trackedValues: _positionTrackerValues});
-
-            for (uint256 i = 0; i < _positionTrackerValues.length; i++) {
-                trackedPositionsValue += _positionTrackerValues[i];
-            }
-        }
-
-        // Set shares supply
-        increaseSharesSupply({_shares: address(shares), _increaseAmount: _totalShares});
-
-        // Warp to some time for the update
-        uint256 updateTimestamp = 123;
-        vm.warp(updateTimestamp);
-
-        if (_hasFeeManager && _totalShares > 0) {
-            // Assert FeeManager is called with expected total positions value
-            uint256 totalPositionsValue = uint256(_untrackedValue) + uint256(trackedPositionsValue);
-
-            vm.expectCall(
-                feeManager, abi.encodeWithSelector(IFeeManager.settleDynamicFees.selector, totalPositionsValue)
-            );
-        }
-
-        // Pre-assert expected event
-        vm.expectEmit(address(shares));
-        emit Shares.ShareValueUpdated({
-            netShareValue: _expectedValuePerShare,
-            trackedPositionsValue: trackedPositionsValue,
-            untrackedPositionsValue: _untrackedValue,
-            totalFeesOwed: _feesOwed
-        });
-
-        // UPDATE SHARE VALUE
-        vm.prank(owner);
-        shares.updateShareValue(_untrackedValue);
-
-        // Warp to some other time for the query
-        vm.warp(updateTimestamp + 8);
-
-        (uint256 valuePerShare, uint256 timestamp) = shares.getLastShareValue();
-
-        assertEq(valuePerShare, _expectedValuePerShare);
-        assertEq(timestamp, updateTimestamp);
     }
 }
