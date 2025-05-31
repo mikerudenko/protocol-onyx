@@ -27,7 +27,7 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
 
     struct OracleInfo {
         address oracle; // valueAsset => asset
-        uint32 oracleTimestampTolerance; // seconds
+        uint24 oracleTimestampTolerance; // seconds
         uint8 oracleDecimals; // cache
     }
 
@@ -56,7 +56,7 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
     // Events
     //==================================================================================================================
 
-    event AssetOracleSet(address oracle, uint32 timestampTolerance);
+    event AssetOracleSet(address oracle, uint24 timestampTolerance);
 
     event AssetSet(address asset);
 
@@ -80,7 +80,7 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
         emit AssetSet({asset: _asset});
     }
 
-    function setAssetOracle(address _oracle, uint32 _oracleTimestampTolerance) external onlyAdminOrOwner {
+    function setAssetOracle(address _oracle, uint24 _oracleTimestampTolerance) external onlyAdminOrOwner {
         ERC7540LikeIssuanceBaseStorage storage $ = __getERC7540LikeIssuanceBaseStorage();
         $.assetOracleInfo = OracleInfo({
             oracle: _oracle,

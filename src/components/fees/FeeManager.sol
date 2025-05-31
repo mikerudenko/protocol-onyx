@@ -29,7 +29,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     struct FeeAssetInfo {
         address asset;
         address oracle; // valueAsset => fee asset
-        uint32 oracleTimestampTolerance; // seconds
+        uint24 oracleTimestampTolerance; // seconds
         uint8 oracleDecimals; // cache
         uint8 assetDecimals; // cache
     }
@@ -74,7 +74,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
 
     event ExitFeeSettled(address recipient, uint256 value);
 
-    event FeeAssetSet(address asset, address oracle, uint32 oracleTimestampTolerance);
+    event FeeAssetSet(address asset, address oracle, uint24 oracleTimestampTolerance);
 
     event FeesClaimed(address caller, address onBehalf, uint256 value, address feeAsset, uint256 feeAssetAmount);
 
@@ -137,7 +137,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     }
 
     /// @dev Asset and oracle cannot be unset. To temporarily block claiming fees, e.g., a reverting oracle can be set.
-    function setFeeAsset(address _asset, address _oracle, uint32 _oracleTimestampTolerance) external onlyAdminOrOwner {
+    function setFeeAsset(address _asset, address _oracle, uint24 _oracleTimestampTolerance) external onlyAdminOrOwner {
         require(_asset != address(0), FeeManager__SetFeeAsset__NoAsset());
         require(_oracle != address(0), FeeManager__SetFeeAsset__NoOracle());
 

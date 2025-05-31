@@ -158,7 +158,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         address feeAsset = address(new MockERC20(feeAssetDecimals));
 
         address oracle = address(new MockChainlinkAggregator(oracleDecimals));
-        uint32 oracleTimestampTolerance = 1 days;
+        uint24 oracleTimestampTolerance = 1 days;
 
         vm.expectEmit(address(feeManager));
         emit FeeManager.FeeAssetSet({
