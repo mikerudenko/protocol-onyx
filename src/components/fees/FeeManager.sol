@@ -110,6 +110,8 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
 
     error FeeManager__SetPerformanceFee__RecipientZeroAddress();
 
+    error FeeManager__SettleDynamicFees__Unauthorized();
+
     //==================================================================================================================
     // Config (access: Shares admin or owner)
     //==================================================================================================================
@@ -208,10 +210,15 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     }
 
     //==================================================================================================================
-    // Settle Fees (access: Shares)
+    // Settle Fees (access: mixed)
     //==================================================================================================================
 
-    function settleDynamicFees(uint256 _totalPositionsValue) external override onlyShares {
+    /// @dev Callable by: ShareValueHandler
+    function settleDynamicFees(uint256 _totalPositionsValue) external override {
+        require(
+            msg.sender == Shares(__getShares()).getShareValueHandler(), FeeManager__SettleDynamicFees__Unauthorized()
+        );
+
         // Deduct unclaimed fees
         uint256 netValue = _totalPositionsValue - getTotalValueOwed();
 

@@ -69,6 +69,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
     Shares shares;
     address owner;
     address admin = makeAddr("FeeManagerTest.admin");
+    address shareValueHandler = makeAddr("FeeManagerTest.shareValueHandler");
 
     FeeManagerHarness feeManager;
 
@@ -83,6 +84,11 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         feeManager = new FeeManagerHarness(address(shares));
         vm.prank(admin);
         shares.setFeeManager(address(feeManager));
+
+        // Create a mock ShareValueHandler and set it on Shares
+        shareValueHandler = makeAddr("FeeManagerTest.shareValueHandler");
+        vm.prank(admin);
+        shares.setShareValueHandler(shareValueHandler);
     }
 
     //==================================================================================================================
@@ -274,7 +280,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         // Use a mock fee to add to the feeRecipient's value owed by settling the fee
         address managementFeeTracker = setMockManagementFee({_feeManager: address(feeManager), _admin: admin});
         managementFeeTracker_mockSettleManagementFee({_managementFeeTracker: managementFeeTracker, _valueDue: valueDue});
-        vm.prank(address(shares));
+        vm.prank(shareValueHandler);
         feeManager.settleDynamicFees({_totalPositionsValue: valueDue * 3});
         address feeRecipient = feeManager.getManagementFeeRecipient();
         assertEq(feeManager.getValueOwedToUser(feeRecipient), valueDue);
@@ -341,14 +347,14 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
     function test_settleDynamicFees_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyShares__Unauthorized.selector);
+        vm.expectRevert(FeeManager.FeeManager__SettleDynamicFees__Unauthorized.selector);
 
         vm.prank(randomUser);
         feeManager.settleDynamicFees(0);
     }
 
     function test_settleDynamicFees_success_noFees() public {
-        vm.prank(address(shares));
+        vm.prank(shareValueHandler);
         feeManager.settleDynamicFees({_totalPositionsValue: 123});
 
         assertEq(feeManager.getTotalValueOwed(), 0);
@@ -373,7 +379,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectEmit(address(feeManager));
         emit FeeManager.ManagementFeeSettled({recipient: feeManager.getManagementFeeRecipient(), value: feeValueDue});
 
-        vm.prank(address(shares));
+        vm.prank(shareValueHandler);
         feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeManager.getTotalValueOwed(), feeValueDue);
@@ -399,7 +405,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectEmit(address(feeManager));
         emit FeeManager.PerformanceFeeSettled({recipient: feeManager.getPerformanceFeeRecipient(), value: feeValueDue});
 
-        vm.prank(address(shares));
+        vm.prank(shareValueHandler);
         feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeManager.getTotalValueOwed(), feeValueDue);
@@ -449,7 +455,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
             value: performanceFeeValueDue
         });
 
-        vm.prank(address(shares));
+        vm.prank(shareValueHandler);
         feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         uint256 totalValueOwedAfter1stSettlement = managementFeeValueDue + performanceFeeValueDue;
@@ -476,7 +482,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
             });
         }
 
-        vm.prank(address(shares));
+        vm.prank(shareValueHandler);
         feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeManager.getTotalValueOwed(), 2 * totalValueOwedAfter1stSettlement);
