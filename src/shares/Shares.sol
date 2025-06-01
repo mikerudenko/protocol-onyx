@@ -258,11 +258,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // Config (access: admin or owner)
     //==================================================================================================================
 
-    /// @dev Only changes the stored valueAsset value, does not update any components that may rely on that value
-    function setValueAsset(bytes32 _valueAsset) external onlyAdminOrOwner {
-        __setValueAsset(_valueAsset);
-    }
-
     // ASSET SOURCES AND DESTINATIONS
 
     function setDepositAssetsDest(address _depositAssetsDest) external onlyAdminOrOwner {

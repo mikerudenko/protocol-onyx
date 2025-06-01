@@ -192,34 +192,6 @@ contract SharesTest is Test, TestHelpers {
         assertFalse(shares.isAdminOrOwner(randomUser));
     }
 
-    function test_setValueAsset_fail_empty() public {
-        vm.expectRevert(Shares.Shares__SetValueAsset__Empty.selector);
-
-        vm.prank(admin);
-        shares.setValueAsset("");
-    }
-
-    function test_setValueAsset_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.setValueAsset("test");
-    }
-
-    function test_setValueAsset_success() public {
-        bytes32 newValueAsset = keccak256("test_setValueAsset");
-
-        vm.expectEmit(address(shares));
-        emit Shares.ValueAssetSet(newValueAsset);
-
-        vm.prank(admin);
-        shares.setValueAsset(newValueAsset);
-
-        assertEq(shares.getValueAsset(), newValueAsset);
-    }
-
     // ASSET SOURCES AND DESTINATIONS
 
     function test_setDepositAssetsDest_fail_unauthorized() public {
