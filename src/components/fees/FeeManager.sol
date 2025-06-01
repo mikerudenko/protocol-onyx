@@ -137,6 +137,8 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     }
 
     /// @dev Asset and oracle cannot be unset. To temporarily block claiming fees, e.g., a reverting oracle can be set.
+    /// Asset and oracle registration are coupled to prevent, e.g., updating an asset prior to updating the oracle,
+    /// leading to an incorrect conversion rate.
     function setFeeAsset(address _asset, address _oracle, uint24 _oracleTimestampTolerance) external onlyAdminOrOwner {
         require(_asset != address(0), FeeManager__SetFeeAsset__NoAsset());
         require(_oracle != address(0), FeeManager__SetFeeAsset__NoOracle());
