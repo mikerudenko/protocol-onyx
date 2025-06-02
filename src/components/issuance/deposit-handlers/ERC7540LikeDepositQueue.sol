@@ -79,6 +79,8 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
 
     error ERC7540LikeDepositQueue__CancelRequest__Unauthorized();
 
+    error ERC7540LikeDepositQueue__ExecuteDepositRequests__ZeroShares();
+
     error ERC7540LikeDepositQueue__RequestDeposit__ControllerNotAllowedDepositor();
 
     error ERC7540LikeDepositQueue__RequestDeposit__OwnerNotController();
@@ -210,6 +212,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
             });
             uint256 netShares =
                 shares.mintFor({_to: request.controller, _grossSharesAmount: grossSharesAmount, _skipFee: false});
+            require(netShares > 0, ERC7540LikeDepositQueue__ExecuteDepositRequests__ZeroShares());
 
             // Required event for ERC7540
             emit Deposit({
