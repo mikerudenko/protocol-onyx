@@ -418,26 +418,26 @@ contract SharesTest is Test, TestHelpers {
         assertEq(shares.getFeeManager(), newFeeManager);
     }
 
-    function test_setShareValueHandler_fail_unauthorized() public {
+    function test_setValuationHandler_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
-        address newShareValueHandler = makeAddr("newShareValueHandler");
+        address newValuationHandler = makeAddr("newValuationHandler");
 
         vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shares.setShareValueHandler(newShareValueHandler);
+        shares.setValuationHandler(newValuationHandler);
     }
 
-    function test_setShareValueHandler_success() public {
-        address newShareValueHandler = makeAddr("newShareValueHandler");
+    function test_setValuationHandler_success() public {
+        address newValuationHandler = makeAddr("newValuationHandler");
 
         vm.expectEmit(address(shares));
-        emit Shares.ShareValueHandlerSet(newShareValueHandler);
+        emit Shares.ValuationHandlerSet(newValuationHandler);
 
         vm.prank(admin);
-        shares.setShareValueHandler(newShareValueHandler);
+        shares.setValuationHandler(newValuationHandler);
 
-        assertEq(shares.getShareValueHandler(), newShareValueHandler);
+        assertEq(shares.getValuationHandler(), newValuationHandler);
     }
 
     // SHARES HOLDING
@@ -541,13 +541,13 @@ contract SharesTest is Test, TestHelpers {
         uint256 expectedSharePrice = 123;
         uint256 expectedTimestamp = 456;
 
-        // Set share value handler
-        address shareValueHandler = makeAddr("shareValueHandler");
+        // Set valuation handler
+        address valuationHandler = makeAddr("valuationHandler");
         vm.prank(admin);
-        shares.setShareValueHandler(shareValueHandler);
+        shares.setValuationHandler(valuationHandler);
 
-        shareValueHandler_mockGetSharePrice({
-            _shareValueHandler: shareValueHandler,
+        valuationHandler_mockGetSharePrice({
+            _valuationHandler: valuationHandler,
             _sharePrice: expectedSharePrice,
             _timestamp: expectedTimestamp
         });
@@ -562,13 +562,13 @@ contract SharesTest is Test, TestHelpers {
         uint256 expectedSharePrice = 123;
         uint256 expectedTimestamp = 456;
 
-        // Set share value handler
-        address shareValueHandler = makeAddr("shareValueHandler");
+        // Set valuation handler
+        address valuationHandler = makeAddr("valuationHandler");
         vm.prank(admin);
-        shares.setShareValueHandler(shareValueHandler);
+        shares.setValuationHandler(valuationHandler);
 
-        shareValueHandler_mockGetShareValue({
-            _shareValueHandler: shareValueHandler,
+        valuationHandler_mockGetShareValue({
+            _valuationHandler: valuationHandler,
             _shareValue: expectedSharePrice,
             _timestamp: expectedTimestamp
         });

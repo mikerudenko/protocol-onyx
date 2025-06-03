@@ -11,14 +11,14 @@
 
 pragma solidity ^0.8.0;
 
-import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
+import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 import {ComponentHarnessMixin} from "test/harnesses/utils/ComponentHarnessMixin.sol";
 
-contract ShareValueHandlerHarness is ShareValueHandler, ComponentHarnessMixin {
+contract ValuationHandlerHarness is ValuationHandler, ComponentHarnessMixin {
     constructor(address _shares) ComponentHarnessMixin(_shares) {}
 
     function harness_setLastShareValue(uint256 _shareValue, uint256 _timestamp) public {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
         $.lastShareValue = uint128(_shareValue);
         $.lastShareValueTimestamp = uint40(_timestamp);
     }

@@ -16,7 +16,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC7540LikeDepositHandler} from "src/components/issuance/deposit-handlers/IERC7540LikeDepositHandler.sol";
 import {ERC7540LikeIssuanceBase} from "src/components/issuance/utils/ERC7540LikeIssuanceBase.sol";
-import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
+import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
@@ -181,10 +181,10 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
 
     function executeDepositRequests(uint256[] memory _requestIds) external onlyAdminOrOwner {
         Shares shares = Shares(__getShares());
-        ShareValueHandler shareValueHandler = ShareValueHandler(shares.getShareValueHandler());
+        ValuationHandler valuationHandler = ValuationHandler(shares.getValuationHandler());
 
         // Calculate the share price in the deposit asset
-        (uint256 sharePriceInDepositAsset,) = shareValueHandler.getSharePriceAsAssetAmount({_asset: asset()});
+        (uint256 sharePriceInDepositAsset,) = valuationHandler.getSharePriceAsAssetAmount({_asset: asset()});
 
         // Fulfill requests
         uint256 totalAssetsDeposited;

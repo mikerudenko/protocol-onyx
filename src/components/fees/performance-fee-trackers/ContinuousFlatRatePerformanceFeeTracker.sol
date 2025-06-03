@@ -13,7 +13,7 @@ pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
-import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
+import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {FeeTrackerHelpersMixin} from "src/components/fees/utils/FeeTrackerHelpersMixin.sol";
 import {ONE_HUNDRED_PERCENT_BPS} from "src/utils/Constants.sol";
@@ -105,9 +105,9 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
             // case: no shares
             // Reset hwm to default share price without settlement
 
-            ShareValueHandler shareValueHandler = ShareValueHandler(shares.getShareValueHandler());
+            ValuationHandler valuationHandler = ValuationHandler(shares.getValuationHandler());
 
-            __updateHighWaterMark({_sharePrice: shareValueHandler.getDefaultSharePrice()});
+            __updateHighWaterMark({_sharePrice: valuationHandler.getDefaultSharePrice()});
 
             return 0;
         }

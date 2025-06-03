@@ -14,7 +14,7 @@ pragma solidity 0.8.28;
 import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IManagementFeeTracker} from "src/components/fees/interfaces/IManagementFeeTracker.sol";
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
-import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
+import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {Shares} from "src/shares/Shares.sol";
@@ -165,10 +165,10 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
         // `_value > owed` reverts in __updateValueOwed()
 
         Shares shares = Shares(__getShares());
-        ShareValueHandler shareValueHandler = ShareValueHandler(shares.getShareValueHandler());
+        ValuationHandler valuationHandler = ValuationHandler(shares.getValuationHandler());
         address feeAsset = getFeeAsset();
 
-        feeAssetAmount_ = shareValueHandler.convertValueToAssetAmount({_value: _value, _asset: feeAsset});
+        feeAssetAmount_ = valuationHandler.convertValueToAssetAmount({_value: _value, _asset: feeAsset});
         require(feeAssetAmount_ > 0, FeeManager__ClaimFees__ZeroFeeAsset());
 
         __updateValueOwed({_user: _onBehalf, _delta: -int256(_value)});
@@ -188,10 +188,10 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     // Settle Fees (access: mixed)
     //==================================================================================================================
 
-    /// @dev Callable by: ShareValueHandler
+    /// @dev Callable by: ValuationHandler
     function settleDynamicFees(uint256 _totalPositionsValue) external override {
         require(
-            msg.sender == Shares(__getShares()).getShareValueHandler(), FeeManager__SettleDynamicFees__Unauthorized()
+            msg.sender == Shares(__getShares()).getValuationHandler(), FeeManager__SettleDynamicFees__Unauthorized()
         );
 
         // Deduct unclaimed fees

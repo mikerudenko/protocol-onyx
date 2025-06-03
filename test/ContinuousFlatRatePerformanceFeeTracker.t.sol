@@ -117,14 +117,14 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
     function test_settlePerformanceFee_success_noSharesSupply() public {
         uint256 defaultSharePrice = 12345678;
 
-        // Set share value handler with default share price
-        address shareValueHandler = makeAddr("shareValueHandler");
-        shareValueHandler_mockGetDefaultSharePrice({
-            _shareValueHandler: shareValueHandler,
+        // Set valuation handler with default share price
+        address valuationHandler = makeAddr("valuationHandler");
+        valuationHandler_mockGetDefaultSharePrice({
+            _valuationHandler: valuationHandler,
             _defaultSharePrice: defaultSharePrice
         });
         vm.prank(admin);
-        shares.setShareValueHandler(shareValueHandler);
+        shares.setValuationHandler(valuationHandler);
 
         // Give initial HWM that is not default value
         uint256 initialSharePrice = VALUE_ASSET_PRECISION * 11;

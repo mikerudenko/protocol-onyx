@@ -15,7 +15,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
 import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
-import {IShareValueHandler} from "src/interfaces/IShareValueHandler.sol";
+import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
 import {BlankFeeManager, BlankPositionTracker} from "test/mocks/Blanks.sol";
@@ -49,24 +49,22 @@ contract TestHelpers is Test {
         vm.mockCall(_positionTracker, IPositionTracker.getPositionValue.selector, abi.encode(_value));
     }
 
-    function shareValueHandler_mockGetDefaultSharePrice(address _shareValueHandler, uint256 _defaultSharePrice)
+    function valuationHandler_mockGetDefaultSharePrice(address _valuationHandler, uint256 _defaultSharePrice)
         internal
     {
-        vm.mockCall(
-            _shareValueHandler, IShareValueHandler.getDefaultSharePrice.selector, abi.encode(_defaultSharePrice)
-        );
+        vm.mockCall(_valuationHandler, IValuationHandler.getDefaultSharePrice.selector, abi.encode(_defaultSharePrice));
     }
 
-    function shareValueHandler_mockGetSharePrice(address _shareValueHandler, uint256 _sharePrice, uint256 _timestamp)
+    function valuationHandler_mockGetSharePrice(address _valuationHandler, uint256 _sharePrice, uint256 _timestamp)
         internal
     {
-        vm.mockCall(_shareValueHandler, IShareValueHandler.getSharePrice.selector, abi.encode(_sharePrice, _timestamp));
+        vm.mockCall(_valuationHandler, IValuationHandler.getSharePrice.selector, abi.encode(_sharePrice, _timestamp));
     }
 
-    function shareValueHandler_mockGetShareValue(address _shareValueHandler, uint256 _shareValue, uint256 _timestamp)
+    function valuationHandler_mockGetShareValue(address _valuationHandler, uint256 _shareValue, uint256 _timestamp)
         internal
     {
-        vm.mockCall(_shareValueHandler, IShareValueHandler.getShareValue.selector, abi.encode(_shareValue, _timestamp));
+        vm.mockCall(_valuationHandler, IValuationHandler.getShareValue.selector, abi.encode(_shareValue, _timestamp));
     }
 
     function shares_mockSharePrice(address _shares, uint256 _sharePrice, uint256 _timestamp) internal {

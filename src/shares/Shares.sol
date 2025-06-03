@@ -16,7 +16,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
-import {IShareValueHandler} from "src/interfaces/IShareValueHandler.sol";
+import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
 
@@ -54,7 +54,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         address redeemAssetsSrc;
         address feeAssetsSrc;
         address feeManager;
-        address shareValueHandler;
+        address valuationHandler;
         mapping(address => bool) isDepositHandler;
         mapping(address => bool) isRedeemHandler;
         mapping(address => bool) isAdmin;
@@ -98,7 +98,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event RedeemHandlerRemoved(address queue);
 
-    event ShareValueHandlerSet(address shareValueHandler);
+    event ValuationHandlerSet(address valuationHandler);
 
     event ValueAssetSet(bytes32 valueAsset);
 
@@ -325,11 +325,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         emit FeeManagerSet(_feeManager);
     }
 
-    function setShareValueHandler(address _shareValueHandler) external onlyAdminOrOwner {
+    function setValuationHandler(address _valuationHandler) external onlyAdminOrOwner {
         SharesStorage storage $ = __getSharesStorage();
-        $.shareValueHandler = _shareValueHandler;
+        $.valuationHandler = _valuationHandler;
 
-        emit ShareValueHandlerSet(_shareValueHandler);
+        emit ValuationHandlerSet(_valuationHandler);
     }
 
     // SHARES HOLDING
@@ -375,11 +375,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     //==================================================================================================================
 
     function sharePrice() external view returns (uint256 price_, uint256 timestamp_) {
-        return IShareValueHandler(getShareValueHandler()).getSharePrice();
+        return IValuationHandler(getValuationHandler()).getSharePrice();
     }
 
     function shareValue() external view returns (uint256 value_, uint256 timestamp_) {
-        return IShareValueHandler(getShareValueHandler()).getShareValue();
+        return IValuationHandler(getValuationHandler()).getShareValue();
     }
 
     //==================================================================================================================
@@ -499,8 +499,8 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         return __getSharesStorage().redeemAssetsSrc;
     }
 
-    function getShareValueHandler() public view returns (address) {
-        return __getSharesStorage().shareValueHandler;
+    function getValuationHandler() public view returns (address) {
+        return __getSharesStorage().valuationHandler;
     }
 
     function getValueAsset() public view returns (bytes32) {

@@ -14,19 +14,19 @@ pragma solidity 0.8.28;
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
 import {Shares} from "src/shares/Shares.sol";
-import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
+import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 
-import {ShareValueHandlerHarness} from "test/harnesses/ShareValueHandlerHarness.sol";
+import {ValuationHandlerHarness} from "test/harnesses/ValuationHandlerHarness.sol";
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
 
-contract ShareValueHandlerTest is TestHelpers {
+contract ValuationHandlerTest is TestHelpers {
     Shares shares;
     address owner;
-    address admin = makeAddr("ShareValueHandlerTest.admin");
+    address admin = makeAddr("ValuationHandlerTest.admin");
 
-    ShareValueHandlerHarness shareValueHandler;
+    ValuationHandlerHarness valuationHandler;
 
     function setUp() public {
         shares = createShares();
@@ -35,7 +35,7 @@ contract ShareValueHandlerTest is TestHelpers {
         vm.prank(owner);
         shares.addAdmin(admin);
 
-        shareValueHandler = new ShareValueHandlerHarness({_shares: address(shares)});
+        valuationHandler = new ValuationHandlerHarness({_shares: address(shares)});
     }
 
     //==================================================================================================================
@@ -46,12 +46,12 @@ contract ShareValueHandlerTest is TestHelpers {
         address newPositionTracker = makeAddr("newPositionTracker");
 
         vm.prank(owner);
-        shareValueHandler.addPositionTracker(newPositionTracker);
+        valuationHandler.addPositionTracker(newPositionTracker);
 
-        vm.expectRevert(ShareValueHandler.ShareValueHandler__AddPositionTracker__AlreadyAdded.selector);
+        vm.expectRevert(ValuationHandler.ValuationHandler__AddPositionTracker__AlreadyAdded.selector);
 
         vm.prank(owner);
-        shareValueHandler.addPositionTracker(newPositionTracker);
+        valuationHandler.addPositionTracker(newPositionTracker);
     }
 
     function test_addPositionTracker_fail_unauthorized() public {
@@ -61,30 +61,30 @@ contract ShareValueHandlerTest is TestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shareValueHandler.addPositionTracker(newPositionTracker);
+        valuationHandler.addPositionTracker(newPositionTracker);
     }
 
     function test_addPositionTracker_success() public {
         address newPositionTracker = makeAddr("newPositionTracker");
 
-        vm.expectEmit(address(shareValueHandler));
-        emit ShareValueHandler.PositionTrackerAdded(newPositionTracker);
+        vm.expectEmit(address(valuationHandler));
+        emit ValuationHandler.PositionTrackerAdded(newPositionTracker);
 
         vm.prank(owner);
-        shareValueHandler.addPositionTracker(newPositionTracker);
+        valuationHandler.addPositionTracker(newPositionTracker);
 
-        assertTrue(shareValueHandler.isPositionTracker(newPositionTracker));
-        assertEq(shareValueHandler.getPositionTrackers().length, 1);
-        assertEq(shareValueHandler.getPositionTrackers()[0], newPositionTracker);
+        assertTrue(valuationHandler.isPositionTracker(newPositionTracker));
+        assertEq(valuationHandler.getPositionTrackers().length, 1);
+        assertEq(valuationHandler.getPositionTrackers()[0], newPositionTracker);
     }
 
     function test_removePositionTracker_fail_alreadyRemoved() public {
         address trackerToRemove = makeAddr("trackerToRemove");
 
-        vm.expectRevert(ShareValueHandler.ShareValueHandler__RemovePositionTracker__AlreadyRemoved.selector);
+        vm.expectRevert(ValuationHandler.ValuationHandler__RemovePositionTracker__AlreadyRemoved.selector);
 
         vm.prank(owner);
-        shareValueHandler.removePositionTracker(trackerToRemove);
+        valuationHandler.removePositionTracker(trackerToRemove);
     }
 
     function test_removePositionTracker_fail_unauthorized() public {
@@ -94,23 +94,23 @@ contract ShareValueHandlerTest is TestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shareValueHandler.removePositionTracker(trackerToRemove);
+        valuationHandler.removePositionTracker(trackerToRemove);
     }
 
     function test_removePositionTracker_success() public {
         address trackerToRemove = makeAddr("trackerToRemove");
 
         vm.prank(owner);
-        shareValueHandler.addPositionTracker(trackerToRemove);
+        valuationHandler.addPositionTracker(trackerToRemove);
 
-        vm.expectEmit(address(shareValueHandler));
-        emit ShareValueHandler.PositionTrackerRemoved(trackerToRemove);
+        vm.expectEmit(address(valuationHandler));
+        emit ValuationHandler.PositionTrackerRemoved(trackerToRemove);
 
         vm.prank(owner);
-        shareValueHandler.removePositionTracker(trackerToRemove);
+        valuationHandler.removePositionTracker(trackerToRemove);
 
-        assertFalse(shareValueHandler.isPositionTracker(trackerToRemove));
-        assertEq(shareValueHandler.getPositionTrackers().length, 0);
+        assertFalse(valuationHandler.isPositionTracker(trackerToRemove));
+        assertEq(valuationHandler.getPositionTrackers().length, 0);
     }
 
     function test_setAssetOracle_fail_notAdminOrOwner() public {
@@ -121,7 +121,7 @@ contract ShareValueHandlerTest is TestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shareValueHandler.setAssetOracle({
+        valuationHandler.setAssetOracle({
             _asset: asset,
             _oracle: oracle,
             _quotedInValueAsset: true,
@@ -138,7 +138,7 @@ contract ShareValueHandlerTest is TestHelpers {
         bool quotedInValueAsset = true;
 
         vm.expectEmit();
-        emit ShareValueHandler.AssetOracleSet({
+        emit ValuationHandler.AssetOracleSet({
             asset: asset,
             oracle: oracle,
             quotedInValueAsset: quotedInValueAsset,
@@ -146,14 +146,14 @@ contract ShareValueHandlerTest is TestHelpers {
         });
 
         vm.prank(admin);
-        shareValueHandler.setAssetOracle({
+        valuationHandler.setAssetOracle({
             _asset: asset,
             _oracle: oracle,
             _quotedInValueAsset: quotedInValueAsset,
             _timestampTolerance: timestampTolerance
         });
 
-        ShareValueHandler.AssetOracleInfo memory oracleInfo = shareValueHandler.getAssetOracleInfo({_asset: asset});
+        ValuationHandler.AssetOracleInfo memory oracleInfo = valuationHandler.getAssetOracleInfo({_asset: asset});
 
         assertEq(oracleInfo.oracle, oracle);
         assertEq(oracleInfo.timestampTolerance, timestampTolerance);
@@ -169,7 +169,7 @@ contract ShareValueHandlerTest is TestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shareValueHandler.unsetAssetOracle(asset);
+        valuationHandler.unsetAssetOracle(asset);
     }
 
     function test_unsetAssetOracle_success() public {
@@ -178,7 +178,7 @@ contract ShareValueHandlerTest is TestHelpers {
 
         // Set oracle
         vm.prank(admin);
-        shareValueHandler.setAssetOracle({
+        valuationHandler.setAssetOracle({
             _asset: asset,
             _oracle: oracle,
             _quotedInValueAsset: true,
@@ -186,13 +186,13 @@ contract ShareValueHandlerTest is TestHelpers {
         });
 
         vm.expectEmit();
-        emit ShareValueHandler.AssetOracleUnset({asset: asset});
+        emit ValuationHandler.AssetOracleUnset({asset: asset});
 
         // Unset oracle
         vm.prank(admin);
-        shareValueHandler.unsetAssetOracle(asset);
+        valuationHandler.unsetAssetOracle(asset);
 
-        ShareValueHandler.AssetOracleInfo memory oracleInfo = shareValueHandler.getAssetOracleInfo({_asset: asset});
+        ValuationHandler.AssetOracleInfo memory oracleInfo = valuationHandler.getAssetOracleInfo({_asset: asset});
         assertEq(oracleInfo.oracle, address(0));
         assertEq(oracleInfo.timestampTolerance, 0);
         assertEq(oracleInfo.quotedInValueAsset, false);
@@ -220,14 +220,14 @@ contract ShareValueHandlerTest is TestHelpers {
 
         // Set oracle
         vm.prank(admin);
-        shareValueHandler.setAssetOracle({
+        valuationHandler.setAssetOracle({
             _asset: asset,
             _oracle: address(oracle),
             _quotedInValueAsset: quotedInValueAsset,
             _timestampTolerance: 0
         });
 
-        uint256 actualValue = shareValueHandler.convertAssetAmountToValue({_asset: asset, _assetAmount: assetAmount});
+        uint256 actualValue = valuationHandler.convertAssetAmountToValue({_asset: asset, _assetAmount: assetAmount});
         assertEq(actualValue, expectedValue);
     }
 
@@ -247,19 +247,19 @@ contract ShareValueHandlerTest is TestHelpers {
 
         // Set oracle
         vm.prank(admin);
-        shareValueHandler.setAssetOracle({
+        valuationHandler.setAssetOracle({
             _asset: asset,
             _oracle: address(oracle),
             _quotedInValueAsset: quotedInValueAsset,
             _timestampTolerance: 0
         });
 
-        uint256 actualAssetAmount = shareValueHandler.convertValueToAssetAmount({_value: value, _asset: asset});
+        uint256 actualAssetAmount = valuationHandler.convertValueToAssetAmount({_value: value, _asset: asset});
         assertEq(actualAssetAmount, expectedAssetAmount);
     }
 
     function test_getDefaultSharePrice_success() public view {
-        uint256 actualSharePrice = shareValueHandler.getDefaultSharePrice();
+        uint256 actualSharePrice = valuationHandler.getDefaultSharePrice();
         assertEq(actualSharePrice, 1e18);
     }
 
@@ -274,9 +274,9 @@ contract ShareValueHandlerTest is TestHelpers {
     function __test_getSharePrice_success(uint256 _shareValue, uint256 _expectedSharePrice, uint256 _valueTimestamp)
         public
     {
-        shareValueHandler.harness_setLastShareValue({_shareValue: _shareValue, _timestamp: _valueTimestamp});
+        valuationHandler.harness_setLastShareValue({_shareValue: _shareValue, _timestamp: _valueTimestamp});
 
-        (uint256 actualSharePrice, uint256 actualTimestamp) = shareValueHandler.getSharePrice();
+        (uint256 actualSharePrice, uint256 actualTimestamp) = valuationHandler.getSharePrice();
         assertEq(actualSharePrice, _expectedSharePrice);
         assertEq(actualTimestamp, _valueTimestamp);
     }
@@ -288,7 +288,7 @@ contract ShareValueHandlerTest is TestHelpers {
         // Set share value
         uint256 shareValue = 5e18; // 5 value units
         uint256 shareValueTimestamp = block.timestamp - 11;
-        shareValueHandler.harness_setLastShareValue({_shareValue: shareValue, _timestamp: shareValueTimestamp});
+        valuationHandler.harness_setLastShareValue({_shareValue: shareValue, _timestamp: shareValueTimestamp});
 
         // Create oracle
         uint8 oracleDecimals = 8;
@@ -305,7 +305,7 @@ contract ShareValueHandlerTest is TestHelpers {
 
         // Set oracle
         vm.prank(admin);
-        shareValueHandler.setAssetOracle({
+        valuationHandler.setAssetOracle({
             _asset: asset,
             _oracle: address(oracle),
             _quotedInValueAsset: quotedInValueAsset,
@@ -313,7 +313,7 @@ contract ShareValueHandlerTest is TestHelpers {
         });
 
         (uint256 actualAssetAmount, uint256 actualTimestamp) =
-            shareValueHandler.getSharePriceAsAssetAmount({_asset: asset});
+            valuationHandler.getSharePriceAsAssetAmount({_asset: asset});
         assertEq(actualAssetAmount, expectedAssetAmount);
         assertEq(actualTimestamp, shareValueTimestamp);
     }
@@ -333,7 +333,7 @@ contract ShareValueHandlerTest is TestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shareValueHandler.updateShareValue(0);
+        valuationHandler.updateShareValue(0);
     }
 
     function test_updateShareValue_success_noShares() public {
@@ -414,7 +414,7 @@ contract ShareValueHandlerTest is TestHelpers {
             positionTracker_mockGetPositionValue({_positionTracker: tracker, _value: _positionTrackerValues[i]});
 
             vm.prank(admin);
-            shareValueHandler.addPositionTracker(tracker);
+            valuationHandler.addPositionTracker(tracker);
 
             trackedPositionsValue += _positionTrackerValues[i];
         }
@@ -436,8 +436,8 @@ contract ShareValueHandlerTest is TestHelpers {
         }
 
         // Pre-assert expected event
-        vm.expectEmit(address(shareValueHandler));
-        emit ShareValueHandler.ShareValueUpdated({
+        vm.expectEmit(address(valuationHandler));
+        emit ValuationHandler.ShareValueUpdated({
             netShareValue: _expectedValuePerShare,
             trackedPositionsValue: trackedPositionsValue,
             untrackedPositionsValue: _untrackedValue,
@@ -446,12 +446,12 @@ contract ShareValueHandlerTest is TestHelpers {
 
         // UPDATE SHARE VALUE
         vm.prank(owner);
-        shareValueHandler.updateShareValue(_untrackedValue);
+        valuationHandler.updateShareValue(_untrackedValue);
 
         // Warp to some other time for the query
         vm.warp(updateTimestamp + 8);
 
-        (uint256 valuePerShare, uint256 timestamp) = shareValueHandler.getShareValue();
+        (uint256 valuePerShare, uint256 timestamp) = valuationHandler.getShareValue();
 
         assertEq(valuePerShare, _expectedValuePerShare);
         assertEq(timestamp, updateTimestamp);

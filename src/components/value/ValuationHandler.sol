@@ -18,17 +18,17 @@ import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.
 import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
 import {IChainlinkAggregator} from "src/interfaces/external/IChainlinkAggregator.sol";
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
-import {IShareValueHandler} from "src/interfaces/IShareValueHandler.sol";
+import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {VALUE_ASSET_PRECISION} from "src/utils/Constants.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
 
-/// @title ShareValueHandler Contract
+/// @title ValuationHandler Contract
 /// @author Enzyme Foundation <security@enzyme.finance>
-/// @notice An IShareValueHandler implementation that supports share value updates by aggregating
+/// @notice An IValuationHandler implementation that supports share value updates by aggregating
 /// untracked (user-input) value and tracked (on-chain) value
-contract ShareValueHandler is IShareValueHandler, ComponentHelpersMixin {
+contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeCast for int256;
     using SafeCast for uint256;
@@ -50,17 +50,17 @@ contract ShareValueHandler is IShareValueHandler, ComponentHelpersMixin {
     //==================================================================================================================
 
     bytes32 public immutable SHARE_VALUE_HANDLER_STORAGE_LOCATION =
-        StorageHelpersLib.deriveErc7201Location("ShareValueHandler");
+        StorageHelpersLib.deriveErc7201Location("ValuationHandler");
 
-    /// @custom:storage-location erc7201:enzyme.ShareValueHandler
-    struct ShareValueHandlerStorage {
+    /// @custom:storage-location erc7201:enzyme.ValuationHandler
+    struct ValuationHandlerStorage {
         EnumerableSet.AddressSet positionTrackers;
         mapping(address => AssetOracleInfo) assetToOracle;
         uint128 lastShareValue;
         uint40 lastShareValueTimestamp;
     }
 
-    function __getShareValueHandlerStorage() internal view returns (ShareValueHandlerStorage storage $) {
+    function __getValuationHandlerStorage() internal view returns (ValuationHandlerStorage storage $) {
         bytes32 location = SHARE_VALUE_HANDLER_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -87,28 +87,28 @@ contract ShareValueHandler is IShareValueHandler, ComponentHelpersMixin {
     // Errors
     //==================================================================================================================
 
-    error ShareValueHandler__AddPositionTracker__AlreadyAdded();
+    error ValuationHandler__AddPositionTracker__AlreadyAdded();
 
-    error ShareValueHandler__RemovePositionTracker__AlreadyRemoved();
+    error ValuationHandler__RemovePositionTracker__AlreadyRemoved();
 
     //==================================================================================================================
     // Config (access: admin or owner)
     //==================================================================================================================
 
     function addPositionTracker(address _positionTracker) external onlyAdminOrOwner {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
 
         bool added = $.positionTrackers.add(_positionTracker);
-        require(added, ShareValueHandler__AddPositionTracker__AlreadyAdded());
+        require(added, ValuationHandler__AddPositionTracker__AlreadyAdded());
 
         emit PositionTrackerAdded(_positionTracker);
     }
 
     function removePositionTracker(address _positionTracker) external onlyAdminOrOwner {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
 
         bool removed = $.positionTrackers.remove(_positionTracker);
-        require(removed, ShareValueHandler__RemovePositionTracker__AlreadyRemoved());
+        require(removed, ValuationHandler__RemovePositionTracker__AlreadyRemoved());
 
         emit PositionTrackerRemoved(_positionTracker);
     }
@@ -117,7 +117,7 @@ contract ShareValueHandler is IShareValueHandler, ComponentHelpersMixin {
         external
         onlyAdminOrOwner
     {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
         $.assetToOracle[_asset] = AssetOracleInfo({
             oracle: _oracle,
             quotedInValueAsset: _quotedInValueAsset,
@@ -135,7 +135,7 @@ contract ShareValueHandler is IShareValueHandler, ComponentHelpersMixin {
     }
 
     function unsetAssetOracle(address _asset) external onlyAdminOrOwner {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
         delete $.assetToOracle[_asset];
 
         emit AssetOracleUnset({asset: _asset});
@@ -202,7 +202,7 @@ contract ShareValueHandler is IShareValueHandler, ComponentHelpersMixin {
     /// @dev Returns 18-decimal precision.
     /// Returns the actual value per share, not the price, which is returned by getSharePrice().
     function getShareValue() public view override returns (uint256 value_, uint256 timestamp_) {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
         return ($.lastShareValue, $.lastShareValueTimestamp);
     }
 
@@ -254,7 +254,7 @@ contract ShareValueHandler is IShareValueHandler, ComponentHelpersMixin {
         // else: no shares, netShareValue_ = 0
 
         // Store share value
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
         $.lastShareValue = netShareValue_.toUint128();
         $.lastShareValueTimestamp = uint40(block.timestamp);
 
@@ -271,17 +271,17 @@ contract ShareValueHandler is IShareValueHandler, ComponentHelpersMixin {
     //==================================================================================================================
 
     function getAssetOracleInfo(address _asset) public view returns (AssetOracleInfo memory assetOracleInfo_) {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
         return $.assetToOracle[_asset];
     }
 
     function getPositionTrackers() public view returns (address[] memory) {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
         return $.positionTrackers.values();
     }
 
     function isPositionTracker(address _positionTracker) public view returns (bool) {
-        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
         return $.positionTrackers.contains(_positionTracker);
     }
 }

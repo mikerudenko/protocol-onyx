@@ -16,11 +16,11 @@ import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/exte
 import {ERC7540LikeRedeemQueue} from "src/components/issuance/redeem-handlers/ERC7540LikeRedeemQueue.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {IERC7540LikeRedeemHandler} from "src/components/issuance/redeem-handlers/IERC7540LikeRedeemHandler.sol";
-import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
+import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
 import {ERC7540LikeRedeemQueueHarness} from "test/harnesses/ERC7540LikeRedeemQueueHarness.sol";
-import {ShareValueHandlerHarness} from "test/harnesses/ShareValueHandlerHarness.sol";
+import {ValuationHandlerHarness} from "test/harnesses/ValuationHandlerHarness.sol";
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
@@ -29,7 +29,7 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
     Shares shares;
     address owner;
     address admin = makeAddr("admin");
-    ShareValueHandler shareValueHandler;
+    ValuationHandler valuationHandler;
 
     ERC7540LikeRedeemQueueHarness redeemQueue;
 
@@ -45,10 +45,10 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
         vm.prank(admin);
         shares.addRedeemHandler(address(redeemQueue));
 
-        // Create a mock ShareValueHandler and set it on Shares
-        shareValueHandler = ShareValueHandler(address(new ShareValueHandlerHarness(address(shares))));
+        // Create a mock ValuationHandler and set it on Shares
+        valuationHandler = ValuationHandler(address(new ValuationHandlerHarness(address(shares))));
         vm.prank(admin);
-        shares.setShareValueHandler(address(shareValueHandler));
+        shares.setValuationHandler(address(valuationHandler));
     }
 
     //==================================================================================================================
@@ -288,7 +288,7 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
         uint8 oracleDecimals = 8;
         MockChainlinkAggregator mockOracle = new MockChainlinkAggregator(oracleDecimals);
         vm.prank(admin);
-        shareValueHandler.setAssetOracle({
+        valuationHandler.setAssetOracle({
             _asset: asset,
             _oracle: address(mockOracle),
             _quotedInValueAsset: quotedInValueAsset,

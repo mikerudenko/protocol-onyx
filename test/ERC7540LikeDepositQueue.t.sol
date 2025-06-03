@@ -16,11 +16,11 @@ import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/exte
 import {ERC7540LikeDepositQueue} from "src/components/issuance/deposit-handlers/ERC7540LikeDepositQueue.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {IERC7540LikeDepositHandler} from "src/components/issuance/deposit-handlers/IERC7540LikeDepositHandler.sol";
-import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
+import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
 import {ERC7540LikeDepositQueueHarness} from "test/harnesses/ERC7540LikeDepositQueueHarness.sol";
-import {ShareValueHandlerHarness} from "test/harnesses/ShareValueHandlerHarness.sol";
+import {ValuationHandlerHarness} from "test/harnesses/ValuationHandlerHarness.sol";
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
@@ -29,7 +29,7 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
     Shares shares;
     address owner;
     address admin = makeAddr("admin");
-    ShareValueHandler shareValueHandler;
+    ValuationHandler valuationHandler;
 
     ERC7540LikeDepositQueueHarness depositQueue;
 
@@ -45,10 +45,10 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         vm.prank(admin);
         shares.addDepositHandler(address(depositQueue));
 
-        // Create a mock ShareValueHandler and set it on Shares
-        shareValueHandler = ShareValueHandler(address(new ShareValueHandlerHarness(address(shares))));
+        // Create a mock ValuationHandler and set it on Shares
+        valuationHandler = ValuationHandler(address(new ValuationHandlerHarness(address(shares))));
         vm.prank(admin);
-        shares.setShareValueHandler(address(shareValueHandler));
+        shares.setValuationHandler(address(valuationHandler));
     }
 
     //==================================================================================================================
@@ -344,7 +344,7 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         uint8 oracleDecimals = 8;
         MockChainlinkAggregator mockOracle = new MockChainlinkAggregator(oracleDecimals);
         vm.prank(admin);
-        shareValueHandler.setAssetOracle({
+        valuationHandler.setAssetOracle({
             _asset: asset,
             _oracle: address(mockOracle),
             _quotedInValueAsset: quotedInValueAsset,
