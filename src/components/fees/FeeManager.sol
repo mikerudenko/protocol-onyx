@@ -14,7 +14,7 @@ pragma solidity 0.8.28;
 import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IManagementFeeTracker} from "src/components/fees/interfaces/IManagementFeeTracker.sol";
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
-import {IChainlinkAggregator} from "src/interfaces/external/IChainlinkAggregator.sol";
+import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {Shares} from "src/shares/Shares.sol";
@@ -26,14 +26,6 @@ import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
 /// @author Enzyme Foundation <security@enzyme.finance>
 /// @notice Manages fees for a Shares contract
 contract FeeManager is IFeeManager, ComponentHelpersMixin {
-    struct FeeAssetInfo {
-        address asset;
-        address oracle; // valueAsset => fee asset
-        uint24 oracleTimestampTolerance; // seconds
-        uint8 oracleDecimals; // cache
-        uint8 assetDecimals; // cache
-    }
-
     //==================================================================================================================
     // Storage
     //==================================================================================================================
@@ -50,7 +42,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
         uint16 entranceFeeBps;
         address exitFeeRecipient; // "burned" if address(0)
         uint16 exitFeeBps;
-        FeeAssetInfo feeAssetInfo;
+        address feeAsset;
         uint256 totalFeesOwed;
         mapping(address => uint256) userFeesOwed;
     }
@@ -74,7 +66,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
 
     event ExitFeeSettled(address recipient, uint256 value);
 
-    event FeeAssetSet(address asset, address oracle, uint24 oracleTimestampTolerance);
+    event FeeAssetSet(address asset);
 
     event FeesClaimed(address caller, address onBehalf, uint256 value, address feeAsset, uint256 feeAssetAmount);
 
@@ -97,10 +89,6 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     error FeeManager__ClaimFees__Unauthorized();
 
     error FeeManager__ClaimFees__ZeroFeeAsset();
-
-    error FeeManager__SetFeeAsset__NoAsset();
-
-    error FeeManager__SetFeeAsset__NoOracle();
 
     error FeeManager__SetEntranceFee__ExceedsMax();
 
@@ -136,23 +124,11 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
         emit ExitFeeSet({feeBps: _feeBps, recipient: _recipient});
     }
 
-    /// @dev Asset and oracle cannot be unset. To temporarily block claiming fees, e.g., a reverting oracle can be set.
-    /// Asset and oracle registration are coupled to prevent, e.g., updating an asset prior to updating the oracle,
-    /// leading to an incorrect conversion rate.
-    function setFeeAsset(address _asset, address _oracle, uint24 _oracleTimestampTolerance) external onlyAdminOrOwner {
-        require(_asset != address(0), FeeManager__SetFeeAsset__NoAsset());
-        require(_oracle != address(0), FeeManager__SetFeeAsset__NoOracle());
-
+    function setFeeAsset(address _asset) external onlyAdminOrOwner {
         FeeManagerStorage storage $ = __getFeeManagerStorage();
-        $.feeAssetInfo = FeeAssetInfo({
-            asset: _asset,
-            oracle: _oracle,
-            oracleTimestampTolerance: _oracleTimestampTolerance,
-            oracleDecimals: IChainlinkAggregator(_oracle).decimals(),
-            assetDecimals: IERC20(_asset).decimals()
-        });
+        $.feeAsset = _asset;
 
-        emit FeeAssetSet({asset: _asset, oracle: _oracle, oracleTimestampTolerance: _oracleTimestampTolerance});
+        emit FeeAssetSet({asset: _asset});
     }
 
     /// @dev _managementFeeTracker can be empty (to disable)
@@ -188,25 +164,22 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
         require(msg.sender == _onBehalf || __isAdminOrOwner(msg.sender), FeeManager__ClaimFees__Unauthorized());
         // `_value > owed` reverts in __updateValueOwed()
 
-        FeeAssetInfo memory feeAssetInfo = getFeeAssetInfo();
-        feeAssetAmount_ = ValueHelpersLib.convertFromValueAssetWithAggregatorV3({
-            _value: _value,
-            _quotePrecision: 10 ** feeAssetInfo.assetDecimals,
-            _oracle: feeAssetInfo.oracle,
-            _oraclePrecision: 10 ** feeAssetInfo.oracleDecimals,
-            _oracleTimestampTolerance: feeAssetInfo.oracleTimestampTolerance
-        });
+        Shares shares = Shares(__getShares());
+        ShareValueHandler shareValueHandler = ShareValueHandler(shares.getShareValueHandler());
+        address feeAsset = getFeeAsset();
+
+        feeAssetAmount_ = shareValueHandler.convertValueToAssetAmount({_value: _value, _asset: feeAsset});
         require(feeAssetAmount_ > 0, FeeManager__ClaimFees__ZeroFeeAsset());
 
         __updateValueOwed({_user: _onBehalf, _delta: -int256(_value)});
 
-        Shares(__getShares()).withdrawFeeAssetTo({_asset: feeAssetInfo.asset, _to: _onBehalf, _amount: feeAssetAmount_});
+        Shares(__getShares()).withdrawFeeAssetTo({_asset: feeAsset, _to: _onBehalf, _amount: feeAssetAmount_});
 
         emit FeesClaimed({
             caller: msg.sender,
             onBehalf: _onBehalf,
             value: _value,
-            feeAsset: feeAssetInfo.asset,
+            feeAsset: feeAsset,
             feeAssetAmount: feeAssetAmount_
         });
     }
@@ -340,8 +313,8 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
         return __getFeeManagerStorage().exitFeeRecipient;
     }
 
-    function getFeeAssetInfo() public view returns (FeeAssetInfo memory feeAssetInfo_) {
-        return __getFeeManagerStorage().feeAssetInfo;
+    function getFeeAsset() public view returns (address feeAsset_) {
+        return __getFeeManagerStorage().feeAsset;
     }
 
     function getManagementFeeRecipient() public view returns (address managementFeeRecipient_) {

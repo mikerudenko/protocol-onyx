@@ -14,5 +14,9 @@ pragma solidity ^0.8.0;
 /// @title IShareValueHandler Interface
 /// @author Enzyme Foundation <security@enzyme.finance>
 interface IShareValueHandler {
+    function getDefaultSharePrice() external view returns (uint256);
+
+    function getSharePrice() external view returns (uint256 price_, uint256 timestamp_);
+
     function getShareValue() external view returns (uint256 value_, uint256 timestamp_);
 }

@@ -18,7 +18,7 @@ import {ContinuousFlatRatePerformanceFeeTracker} from
 import {FeeTrackerHelpersMixin} from "src/components/fees/utils/FeeTrackerHelpersMixin.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {Shares} from "src/shares/Shares.sol";
-import {DEFAULT_SHARE_PRICE, ONE_HUNDRED_PERCENT_BPS} from "src/utils/Constants.sol";
+import {VALUE_ASSET_PRECISION, ONE_HUNDRED_PERCENT_BPS} from "src/utils/Constants.sol";
 
 import {ContinuousFlatRatePerformanceFeeTrackerHarness} from
     "test/harnesses/ContinuousFlatRatePerformanceFeeTrackerHarness.sol";
@@ -115,8 +115,19 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
     }
 
     function test_settlePerformanceFee_success_noSharesSupply() public {
+        uint256 defaultSharePrice = 12345678;
+
+        // Set share value handler with default share price
+        address shareValueHandler = makeAddr("shareValueHandler");
+        shareValueHandler_mockGetDefaultSharePrice({
+            _shareValueHandler: shareValueHandler,
+            _defaultSharePrice: defaultSharePrice
+        });
+        vm.prank(admin);
+        shares.setShareValueHandler(shareValueHandler);
+
         // Give initial HWM that is not default value
-        uint256 initialSharePrice = DEFAULT_SHARE_PRICE * 11;
+        uint256 initialSharePrice = VALUE_ASSET_PRECISION * 11;
         shares_mockSharePrice({_shares: address(shares), _sharePrice: initialSharePrice, _timestamp: block.timestamp});
         vm.prank(admin);
         performanceFeeTracker.resetHighWaterMark();
@@ -125,18 +136,22 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
         __test_settlePerformanceFee_success({
             _rate: 100, // unused
             _netValue: 123, // unused
-            _expectedHwm: DEFAULT_SHARE_PRICE,
+            _expectedHwm: defaultSharePrice,
             _expectedValueDue: 0
         });
     }
 
     function test_settlePerformanceFee_success_belowHwm() public {
         // Give initial HWM of 1e18
-        shares_mockSharePrice({_shares: address(shares), _sharePrice: DEFAULT_SHARE_PRICE, _timestamp: block.timestamp});
+        shares_mockSharePrice({
+            _shares: address(shares),
+            _sharePrice: VALUE_ASSET_PRECISION,
+            _timestamp: block.timestamp
+        });
         vm.prank(admin);
         performanceFeeTracker.resetHighWaterMark();
         uint256 initialHwm = performanceFeeTracker.getHighWaterMark();
-        assertEq(initialHwm, DEFAULT_SHARE_PRICE);
+        assertEq(initialHwm, VALUE_ASSET_PRECISION);
 
         // Report share price decrease
         uint256 netValue = 5_000;
@@ -156,11 +171,15 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
 
     function test_settlePerformanceFee_success_aboveHwm() public {
         // Give initial HWM of 1e18
-        shares_mockSharePrice({_shares: address(shares), _sharePrice: DEFAULT_SHARE_PRICE, _timestamp: block.timestamp});
+        shares_mockSharePrice({
+            _shares: address(shares),
+            _sharePrice: VALUE_ASSET_PRECISION,
+            _timestamp: block.timestamp
+        });
         vm.prank(admin);
         performanceFeeTracker.resetHighWaterMark();
         uint256 initialHwm = performanceFeeTracker.getHighWaterMark();
-        assertEq(initialHwm, DEFAULT_SHARE_PRICE);
+        assertEq(initialHwm, VALUE_ASSET_PRECISION);
 
         // Report share price increase
         uint256 netValue = 30_000;

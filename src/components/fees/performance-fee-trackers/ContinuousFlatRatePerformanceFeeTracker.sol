@@ -13,9 +13,10 @@ pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
+import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {FeeTrackerHelpersMixin} from "src/components/fees/utils/FeeTrackerHelpersMixin.sol";
-import {DEFAULT_SHARE_PRICE, ONE_HUNDRED_PERCENT_BPS} from "src/utils/Constants.sol";
+import {ONE_HUNDRED_PERCENT_BPS} from "src/utils/Constants.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
 
@@ -97,12 +98,16 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
         uint256 hwm = getHighWaterMark();
         require(hwm > 0, ContinuousFlatRatePerformanceFeeTracker__SettlePerformanceFee__HighWaterMarkNotInitialized());
 
-        uint256 sharesSupply = Shares(__getShares()).totalSupply();
+        Shares shares = Shares(__getShares());
+
+        uint256 sharesSupply = shares.totalSupply();
         if (sharesSupply == 0) {
             // case: no shares
-            // Reset hwm to DEFAULT_SHARE_PRICE without settlement
+            // Reset hwm to default share price without settlement
 
-            __updateHighWaterMark({_sharePrice: DEFAULT_SHARE_PRICE});
+            ShareValueHandler shareValueHandler = ShareValueHandler(shares.getShareValueHandler());
+
+            __updateHighWaterMark({_sharePrice: shareValueHandler.getDefaultSharePrice()});
 
             return 0;
         }

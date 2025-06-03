@@ -16,6 +16,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC7540LikeRedeemHandler} from "src/components/issuance/redeem-handlers/IERC7540LikeRedeemHandler.sol";
 import {ERC7540LikeIssuanceBase} from "src/components/issuance/utils/ERC7540LikeIssuanceBase.sol";
+import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
@@ -179,18 +180,10 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
 
     function executeRedeemRequests(uint256[] memory _requestIds) external onlyAdminOrOwner {
         Shares shares = Shares(__getShares());
+        ShareValueHandler shareValueHandler = ShareValueHandler(shares.getShareValueHandler());
 
         // Calculate the share price in the redeem asset
-        (uint256 sharePrice,) = shares.sharePrice();
-        AssetInfo memory assetInfo = getAssetInfo();
-        OracleInfo memory oracleInfo = getAssetOracleInfo();
-        uint256 sharePriceInRedeemAsset = ValueHelpersLib.convertFromValueAssetWithAggregatorV3({
-            _value: sharePrice,
-            _quotePrecision: 10 ** assetInfo.assetDecimals,
-            _oracle: oracleInfo.oracle,
-            _oraclePrecision: 10 ** oracleInfo.oracleDecimals,
-            _oracleTimestampTolerance: oracleInfo.oracleTimestampTolerance
-        });
+        (uint256 sharePriceInRedeemAsset,) = shareValueHandler.getSharePriceAsAssetAmount({_asset: asset()});
 
         // Fulfill requests
         for (uint256 i; i < _requestIds.length; i++) {
@@ -212,7 +205,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
             require(userAssets > 0, ERC7540LikeRedeemQueue__ExecuteRedeemRequests__ZeroAssets());
 
             // Send asset to the user
-            shares.withdrawRedeemAssetTo({_asset: assetInfo.asset, _to: request.controller, _amount: userAssets});
+            shares.withdrawRedeemAssetTo({_asset: asset(), _to: request.controller, _amount: userAssets});
 
             // Required event for ERC7540
             emit Withdraw({

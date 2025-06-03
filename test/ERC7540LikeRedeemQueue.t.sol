@@ -16,9 +16,11 @@ import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/exte
 import {ERC7540LikeRedeemQueue} from "src/components/issuance/redeem-handlers/ERC7540LikeRedeemQueue.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {IERC7540LikeRedeemHandler} from "src/components/issuance/redeem-handlers/IERC7540LikeRedeemHandler.sol";
+import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
 import {ERC7540LikeRedeemQueueHarness} from "test/harnesses/ERC7540LikeRedeemQueueHarness.sol";
+import {ShareValueHandlerHarness} from "test/harnesses/ShareValueHandlerHarness.sol";
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
@@ -27,6 +29,7 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
     Shares shares;
     address owner;
     address admin = makeAddr("admin");
+    ShareValueHandler shareValueHandler;
 
     ERC7540LikeRedeemQueueHarness redeemQueue;
 
@@ -41,6 +44,11 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
         redeemQueue = new ERC7540LikeRedeemQueueHarness(address(shares));
         vm.prank(admin);
         shares.addRedeemHandler(address(redeemQueue));
+
+        // Create a mock ShareValueHandler and set it on Shares
+        shareValueHandler = ShareValueHandler(address(new ShareValueHandlerHarness(address(shares))));
+        vm.prank(admin);
+        shares.setShareValueHandler(address(shareValueHandler));
     }
 
     //==================================================================================================================
@@ -255,16 +263,6 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
 
     // Queues 3 requests, and executes 2 of them
     function test_executeRedeemRequests_success() public {
-        // Create and set the asset and oracle
-        uint8 assetDecimals = 6;
-        uint8 oracleDecimals = 8;
-        address asset = address(new MockERC20(assetDecimals));
-        MockChainlinkAggregator mockOracle = new MockChainlinkAggregator(oracleDecimals);
-        vm.startPrank(admin);
-        redeemQueue.setAsset({_asset: asset});
-        redeemQueue.setAssetOracle({_oracle: address(mockOracle), _oracleTimestampTolerance: 0});
-        vm.stopPrank();
-
         // Define requests
         address request1Controller = makeAddr("controller1");
         address request2Controller = makeAddr("controller2");
@@ -273,15 +271,33 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
         uint256 request1SharesAmount = 1e18; // 1 units
         uint256 request3SharesAmount = 5e18; // 5 units
 
-        uint256 valueAssetToRedeemAssetRate = 3e8; // 3 redeemAsset : 1 valueAsset
+        uint256 redeemAssetToValueAssetRate = 3e8; // 1 redeemAsset : 3 valueAsset
+        bool quotedInValueAsset = false;
         uint256 sharePrice = 1e18; // Keep it simple with 1:1 share price
 
         uint256 request1ExpectedAssetAmount = 3e6; // 3 units
         uint256 request3ExpectedAssetAmount = 15e6; // 15 units
 
+        // Create and set the asset
+        uint8 assetDecimals = 6;
+        address asset = address(new MockERC20(assetDecimals));
+        vm.prank(admin);
+        redeemQueue.setAsset({_asset: asset});
+
+        // Create and set the oracle
+        uint8 oracleDecimals = 8;
+        MockChainlinkAggregator mockOracle = new MockChainlinkAggregator(oracleDecimals);
+        vm.prank(admin);
+        shareValueHandler.setAssetOracle({
+            _asset: asset,
+            _oracle: address(mockOracle),
+            _quotedInValueAsset: quotedInValueAsset,
+            _timestampTolerance: 0
+        });
+
         // Set rates
         shares_mockSharePrice({_shares: address(shares), _sharePrice: sharePrice, _timestamp: block.timestamp});
-        mockOracle.setRate(valueAssetToRedeemAssetRate);
+        mockOracle.setRate(redeemAssetToValueAssetRate);
         mockOracle.setTimestamp(block.timestamp);
 
         // Shares: Set the redeem asset source...

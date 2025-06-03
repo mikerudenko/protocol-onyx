@@ -20,9 +20,11 @@ import {IManagementFeeTracker} from "src/components/fees/interfaces/IManagementF
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
 import {FeeManager} from "src/components/fees/FeeManager.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
+import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
 import {FeeManagerHarness} from "test/harnesses/FeeManagerHarness.sol";
+import {ShareValueHandlerHarness} from "test/harnesses/ShareValueHandlerHarness.sol";
 import {BlankManagementFeeTracker, BlankPerformanceFeeTracker} from "test/mocks/Blanks.sol";
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -69,7 +71,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
     Shares shares;
     address owner;
     address admin = makeAddr("FeeManagerTest.admin");
-    address shareValueHandler = makeAddr("FeeManagerTest.shareValueHandler");
+    ShareValueHandler shareValueHandler;
 
     FeeManagerHarness feeManager;
 
@@ -86,9 +88,9 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         shares.setFeeManager(address(feeManager));
 
         // Create a mock ShareValueHandler and set it on Shares
-        shareValueHandler = makeAddr("FeeManagerTest.shareValueHandler");
+        shareValueHandler = ShareValueHandler(address(new ShareValueHandlerHarness(address(shares))));
         vm.prank(admin);
-        shares.setShareValueHandler(shareValueHandler);
+        shares.setShareValueHandler(address(shareValueHandler));
     }
 
     //==================================================================================================================
@@ -147,35 +149,19 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.setFeeAsset({_asset: address(0), _oracle: address(0), _oracleTimestampTolerance: 0});
+        feeManager.setFeeAsset({_asset: address(0)});
     }
 
     function test_setFeeAsset_success() public {
-        // use different feeAsset and oracle decimals
-        uint8 feeAssetDecimals = 8;
-        uint8 oracleDecimals = 10;
-
-        address feeAsset = address(new MockERC20(feeAssetDecimals));
-
-        address oracle = address(new MockChainlinkAggregator(oracleDecimals));
-        uint24 oracleTimestampTolerance = 1 days;
+        address feeAsset = makeAddr("feeAsset");
 
         vm.expectEmit(address(feeManager));
-        emit FeeManager.FeeAssetSet({
-            asset: feeAsset,
-            oracle: oracle,
-            oracleTimestampTolerance: oracleTimestampTolerance
-        });
+        emit FeeManager.FeeAssetSet({asset: feeAsset});
 
         vm.prank(admin);
-        feeManager.setFeeAsset({_asset: feeAsset, _oracle: oracle, _oracleTimestampTolerance: oracleTimestampTolerance});
+        feeManager.setFeeAsset({_asset: feeAsset});
 
-        FeeManager.FeeAssetInfo memory feeAssetInfo = feeManager.getFeeAssetInfo();
-        assertEq(feeAssetInfo.asset, feeAsset);
-        assertEq(feeAssetInfo.oracle, oracle);
-        assertEq(feeAssetInfo.oracleTimestampTolerance, oracleTimestampTolerance);
-        assertEq(feeAssetInfo.oracleDecimals, oracleDecimals);
-        assertEq(feeAssetInfo.assetDecimals, feeAssetDecimals);
+        assertEq(feeManager.getFeeAsset(), feeAsset);
     }
 
     function test_setManagementFee_fail_unauthorized() public {
@@ -246,10 +232,18 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         MockChainlinkAggregator mockAggregator = new MockChainlinkAggregator(8);
         mockAggregator.setRate(1e8);
         mockAggregator.setTimestamp(block.timestamp);
-
-        // Set the fee asset with oracle
+        bool quotedInValueAsset = true; // doesn't really matter
         vm.prank(admin);
-        feeManager.setFeeAsset({_asset: feeAsset, _oracle: address(mockAggregator), _oracleTimestampTolerance: 0});
+        shareValueHandler.setAssetOracle({
+            _asset: feeAsset,
+            _oracle: address(mockAggregator),
+            _quotedInValueAsset: quotedInValueAsset,
+            _timestampTolerance: 0
+        });
+
+        // Set the fee asset
+        vm.prank(admin);
+        feeManager.setFeeAsset({_asset: feeAsset});
 
         vm.expectRevert(FeeManager.FeeManager__ClaimFees__ZeroFeeAsset.selector);
 
@@ -268,11 +262,12 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
     function __test_claimFees_success(bool _calledByAdmin) internal {
         // Define all amount values
         uint256 valueDue = 500e18;
-        uint256 valueToClaim = 100e18;
+        uint256 valueToClaim = 100e18; // 100 value units
         uint8 feeAssetDecimals = 6;
         uint8 oracleDecimals = 9; // diff decimals from fee asset
-        uint256 oracleRate = 3e9; // 3:1
-        uint256 expectedFeeAssetAmount = 300e6; // 3 fee asset units
+        uint256 oracleRate = 3e9; // 1 value unit => 3 fee units
+        bool quotedInValueAsset = false;
+        uint256 expectedFeeAssetAmount = 300e6; // 300 fee asset units
 
         // Create the fee asset
         MockERC20 mockFeeAsset = new MockERC20(feeAssetDecimals);
@@ -280,7 +275,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         // Use a mock fee to add to the feeRecipient's value owed by settling the fee
         address managementFeeTracker = setMockManagementFee({_feeManager: address(feeManager), _admin: admin});
         managementFeeTracker_mockSettleManagementFee({_managementFeeTracker: managementFeeTracker, _valueDue: valueDue});
-        vm.prank(shareValueHandler);
+        vm.prank(address(shareValueHandler));
         feeManager.settleDynamicFees({_totalPositionsValue: valueDue * 3});
         address feeRecipient = feeManager.getManagementFeeRecipient();
         assertEq(feeManager.getValueOwedToUser(feeRecipient), valueDue);
@@ -289,14 +284,17 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         MockChainlinkAggregator mockAggregator = new MockChainlinkAggregator(oracleDecimals);
         mockAggregator.setRate(oracleRate);
         mockAggregator.setTimestamp(block.timestamp);
-
-        // Set the fee asset with oracle
         vm.prank(admin);
-        feeManager.setFeeAsset({
+        shareValueHandler.setAssetOracle({
             _asset: address(mockFeeAsset),
             _oracle: address(mockAggregator),
-            _oracleTimestampTolerance: 0
+            _quotedInValueAsset: quotedInValueAsset,
+            _timestampTolerance: 0
         });
+
+        // Set the fee asset
+        vm.prank(admin);
+        feeManager.setFeeAsset({_asset: address(mockFeeAsset)});
 
         // Set the fee assets src...
         address feeAssetsSrc = makeAddr("test_claimFees:feeAssetsSrc");
@@ -354,7 +352,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
     }
 
     function test_settleDynamicFees_success_noFees() public {
-        vm.prank(shareValueHandler);
+        vm.prank(address(shareValueHandler));
         feeManager.settleDynamicFees({_totalPositionsValue: 123});
 
         assertEq(feeManager.getTotalValueOwed(), 0);
@@ -379,7 +377,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectEmit(address(feeManager));
         emit FeeManager.ManagementFeeSettled({recipient: feeManager.getManagementFeeRecipient(), value: feeValueDue});
 
-        vm.prank(shareValueHandler);
+        vm.prank(address(shareValueHandler));
         feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeManager.getTotalValueOwed(), feeValueDue);
@@ -405,7 +403,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectEmit(address(feeManager));
         emit FeeManager.PerformanceFeeSettled({recipient: feeManager.getPerformanceFeeRecipient(), value: feeValueDue});
 
-        vm.prank(shareValueHandler);
+        vm.prank(address(shareValueHandler));
         feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeManager.getTotalValueOwed(), feeValueDue);
@@ -455,7 +453,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
             value: performanceFeeValueDue
         });
 
-        vm.prank(shareValueHandler);
+        vm.prank(address(shareValueHandler));
         feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         uint256 totalValueOwedAfter1stSettlement = managementFeeValueDue + performanceFeeValueDue;
@@ -482,7 +480,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
             });
         }
 
-        vm.prank(shareValueHandler);
+        vm.prank(address(shareValueHandler));
         feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeManager.getTotalValueOwed(), 2 * totalValueOwedAfter1stSettlement);

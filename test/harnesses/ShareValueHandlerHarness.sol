@@ -16,4 +16,10 @@ import {ComponentHarnessMixin} from "test/harnesses/utils/ComponentHarnessMixin.
 
 contract ShareValueHandlerHarness is ShareValueHandler, ComponentHarnessMixin {
     constructor(address _shares) ComponentHarnessMixin(_shares) {}
+
+    function harness_setLastShareValue(uint256 _shareValue, uint256 _timestamp) public {
+        ShareValueHandlerStorage storage $ = __getShareValueHandlerStorage();
+        $.lastShareValue = uint128(_shareValue);
+        $.lastShareValueTimestamp = uint40(_timestamp);
+    }
 }

@@ -16,6 +16,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC7540LikeDepositHandler} from "src/components/issuance/deposit-handlers/IERC7540LikeDepositHandler.sol";
 import {ERC7540LikeIssuanceBase} from "src/components/issuance/utils/ERC7540LikeIssuanceBase.sol";
+import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
@@ -119,7 +120,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
         __removeDepositRequest(_requestId);
 
         // Refund deposit asset to the controller
-        IERC20(getAssetInfo().asset).safeTransfer(request.controller, assets_);
+        IERC20(asset()).safeTransfer(request.controller, assets_);
 
         emit DepositRequestCanceled({requestId: _requestId});
     }
@@ -162,7 +163,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
             DepositRequestInfo({controller: _controller, assetAmount: _assets, canCancelTime: canCancelTime});
 
         // Take deposit asset from owner
-        IERC20(getAssetInfo().asset).safeTransferFrom(_owner, address(this), _assets);
+        IERC20(asset()).safeTransferFrom(_owner, address(this), _assets);
 
         // Required event for ERC7540
         emit DepositRequest({
@@ -180,18 +181,10 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
 
     function executeDepositRequests(uint256[] memory _requestIds) external onlyAdminOrOwner {
         Shares shares = Shares(__getShares());
+        ShareValueHandler shareValueHandler = ShareValueHandler(shares.getShareValueHandler());
 
         // Calculate the share price in the deposit asset
-        (uint256 sharePrice,) = shares.sharePrice();
-        AssetInfo memory assetInfo = getAssetInfo();
-        OracleInfo memory oracleInfo = getAssetOracleInfo();
-        uint256 sharePriceInDepositAsset = ValueHelpersLib.convertFromValueAssetWithAggregatorV3({
-            _value: sharePrice,
-            _quotePrecision: 10 ** assetInfo.assetDecimals,
-            _oracle: oracleInfo.oracle,
-            _oraclePrecision: 10 ** oracleInfo.oracleDecimals,
-            _oracleTimestampTolerance: oracleInfo.oracleTimestampTolerance
-        });
+        (uint256 sharePriceInDepositAsset,) = shareValueHandler.getSharePriceAsAssetAmount({_asset: asset()});
 
         // Fulfill requests
         uint256 totalAssetsDeposited;
@@ -226,7 +219,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
         }
 
         // Send the total deposit asset amount to the designated account
-        IERC20(assetInfo.asset).safeTransfer(shares.getDepositAssetsDest(), totalAssetsDeposited);
+        IERC20(asset()).safeTransfer(shares.getDepositAssetsDest(), totalAssetsDeposited);
     }
 
     //==================================================================================================================

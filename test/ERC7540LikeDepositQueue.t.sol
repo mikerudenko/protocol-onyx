@@ -16,9 +16,11 @@ import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/exte
 import {ERC7540LikeDepositQueue} from "src/components/issuance/deposit-handlers/ERC7540LikeDepositQueue.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {IERC7540LikeDepositHandler} from "src/components/issuance/deposit-handlers/IERC7540LikeDepositHandler.sol";
+import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
 import {ERC7540LikeDepositQueueHarness} from "test/harnesses/ERC7540LikeDepositQueueHarness.sol";
+import {ShareValueHandlerHarness} from "test/harnesses/ShareValueHandlerHarness.sol";
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
@@ -27,6 +29,7 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
     Shares shares;
     address owner;
     address admin = makeAddr("admin");
+    ShareValueHandler shareValueHandler;
 
     ERC7540LikeDepositQueueHarness depositQueue;
 
@@ -41,6 +44,11 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         depositQueue = new ERC7540LikeDepositQueueHarness(address(shares));
         vm.prank(admin);
         shares.addDepositHandler(address(depositQueue));
+
+        // Create a mock ShareValueHandler and set it on Shares
+        shareValueHandler = ShareValueHandler(address(new ShareValueHandlerHarness(address(shares))));
+        vm.prank(admin);
+        shares.setShareValueHandler(address(shareValueHandler));
     }
 
     //==================================================================================================================
@@ -131,7 +139,7 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
     function __test_cancelDeposit_success(uint256 _requestId) internal {
         address controller = depositQueue.getDepositRequest(_requestId).controller;
         uint256 depositAssetAmount = depositQueue.getDepositRequest(_requestId).assetAmount;
-        IERC20 depositAsset = IERC20(depositQueue.getAssetInfo().asset);
+        IERC20 depositAsset = IERC20(depositQueue.asset());
 
         uint256 preControllerBalance = depositAsset.balanceOf(controller);
 
@@ -311,16 +319,6 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
 
     // Queues 3 requests, and executes 2 of them
     function test_executeDepositRequests_success() public {
-        // Create and set the asset and oracle
-        uint8 assetDecimals = 6;
-        uint8 oracleDecimals = 8;
-        address asset = address(new MockERC20(assetDecimals));
-        MockChainlinkAggregator mockOracle = new MockChainlinkAggregator(oracleDecimals);
-        vm.startPrank(admin);
-        depositQueue.setAsset({_asset: asset});
-        depositQueue.setAssetOracle({_oracle: address(mockOracle), _oracleTimestampTolerance: 0});
-        vm.stopPrank();
-
         // Define requests
         address request1Controller = makeAddr("controller1");
         address request2Controller = makeAddr("controller2");
@@ -329,11 +327,29 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         uint256 request1AssetAmount = 3_000_000; // 3 units
         uint256 request3AssetAmount = 15_000_000; // 15 units
 
-        uint256 valueAssetToDepositAssetRate = 3e8; // 3 depositAsset : 1 valueAsset
+        uint256 valueAssetToDepositAssetRate = 3e8; // 1 valueAsset : 3 depositAsset
+        bool quotedInValueAsset = false;
         uint256 sharePrice = 1e18; // Keep it simple with 1:1 share price
 
         uint256 request1ExpectedSharesAmount = 1e18; // 1 unit
         uint256 request3ExpectedSharesAmount = 5e18; // 5 units
+
+        // Create and set the asset
+        uint8 assetDecimals = 6;
+        address asset = address(new MockERC20(assetDecimals));
+        vm.prank(admin);
+        depositQueue.setAsset({_asset: asset});
+
+        // Create and set the oracle
+        uint8 oracleDecimals = 8;
+        MockChainlinkAggregator mockOracle = new MockChainlinkAggregator(oracleDecimals);
+        vm.prank(admin);
+        shareValueHandler.setAssetOracle({
+            _asset: asset,
+            _oracle: address(mockOracle),
+            _quotedInValueAsset: quotedInValueAsset,
+            _timestampTolerance: 0
+        });
 
         // Set rates
         shares_mockSharePrice({_shares: address(shares), _sharePrice: sharePrice, _timestamp: block.timestamp});

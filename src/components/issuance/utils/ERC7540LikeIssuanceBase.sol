@@ -13,24 +13,12 @@ pragma solidity 0.8.28;
 
 import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
-import {IChainlinkAggregator} from "src/interfaces/external/IChainlinkAggregator.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 
 /// @title ERC7540LikeIssuanceBase Contract
 /// @author Enzyme Foundation <security@enzyme.finance>
 /// @notice A base contract for the common functions of ERC7540-like deposit and redeem handlers
 contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
-    struct AssetInfo {
-        address asset;
-        uint8 assetDecimals; // cache
-    }
-
-    struct OracleInfo {
-        address oracle; // valueAsset => asset
-        uint24 oracleTimestampTolerance; // seconds
-        uint8 oracleDecimals; // cache
-    }
-
     //==================================================================================================================
     // Storage
     //==================================================================================================================
@@ -39,10 +27,9 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
         StorageHelpersLib.deriveErc7201Location("ERC7540LikeIssuanceBase");
 
     /// @custom:storage-location erc7201:enzyme.ERC7540LikeIssuanceBase
-    /// @param assetInfo Asset and oracle info
+    /// @param asset The asset used for deposit/redeem/value
     struct ERC7540LikeIssuanceBaseStorage {
-        AssetInfo assetInfo;
-        OracleInfo assetOracleInfo;
+        address asset;
     }
 
     function __getERC7540LikeIssuanceBaseStorage() private view returns (ERC7540LikeIssuanceBaseStorage storage $) {
@@ -55,8 +42,6 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
     //==================================================================================================================
     // Events
     //==================================================================================================================
-
-    event AssetOracleSet(address oracle, uint24 timestampTolerance);
 
     event AssetSet(address asset);
 
@@ -75,20 +60,9 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
         require(asset() == address(0), ERC7540LikeIssuanceBase__SetAsset__AlreadySet());
 
         ERC7540LikeIssuanceBaseStorage storage $ = __getERC7540LikeIssuanceBaseStorage();
-        $.assetInfo = AssetInfo({asset: _asset, assetDecimals: IERC20(_asset).decimals()});
+        $.asset = _asset;
 
         emit AssetSet({asset: _asset});
-    }
-
-    function setAssetOracle(address _oracle, uint24 _oracleTimestampTolerance) external onlyAdminOrOwner {
-        ERC7540LikeIssuanceBaseStorage storage $ = __getERC7540LikeIssuanceBaseStorage();
-        $.assetOracleInfo = OracleInfo({
-            oracle: _oracle,
-            oracleTimestampTolerance: _oracleTimestampTolerance,
-            oracleDecimals: IChainlinkAggregator(_oracle).decimals()
-        });
-
-        emit AssetOracleSet({oracle: _oracle, timestampTolerance: _oracleTimestampTolerance});
     }
 
     //==================================================================================================================
@@ -96,7 +70,7 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
     //==================================================================================================================
 
     function asset() public view returns (address asset_) {
-        return getAssetInfo().asset;
+        return __getERC7540LikeIssuanceBaseStorage().asset;
     }
 
     //==================================================================================================================
@@ -105,21 +79,5 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
 
     function share() public view returns (address share_) {
         return __getShares();
-    }
-
-    //==================================================================================================================
-    // State getters
-    //==================================================================================================================
-
-    /// @notice Gets values used for the asset
-    /// @return assetInfo_ The values
-    function getAssetInfo() public view returns (AssetInfo memory assetInfo_) {
-        return __getERC7540LikeIssuanceBaseStorage().assetInfo;
-    }
-
-    /// @notice Gets values used for the asset oracle
-    /// @return oracleInfo_ The values
-    function getAssetOracleInfo() public view returns (OracleInfo memory oracleInfo_) {
-        return __getERC7540LikeIssuanceBaseStorage().assetOracleInfo;
     }
 }

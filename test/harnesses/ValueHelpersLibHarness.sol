@@ -43,14 +43,16 @@ contract ValueHelpersLibHarness {
         uint256 _basePrecision,
         uint256 _quotePrecision,
         uint256 _rate,
-        uint256 _ratePrecision
+        uint256 _ratePrecision,
+        bool _rateQuotedInBase
     ) external pure returns (uint256 convertedAmount_) {
         return ValueHelpersLib.convert({
             _baseAmount: _baseAmount,
             _basePrecision: _basePrecision,
             _quotePrecision: _quotePrecision,
             _rate: _rate,
-            _ratePrecision: _ratePrecision
+            _ratePrecision: _ratePrecision,
+            _rateQuotedInBase: _rateQuotedInBase
         });
     }
 
@@ -59,14 +61,16 @@ contract ValueHelpersLibHarness {
         uint256 _quotePrecision,
         address _oracle,
         uint256 _oraclePrecision,
-        uint256 _oracleTimestampTolerance
+        uint256 _oracleTimestampTolerance,
+        bool _oracleQuotedInValueAsset
     ) external view returns (uint256 quoteAmount_) {
         return ValueHelpersLib.convertFromValueAssetWithAggregatorV3({
             _value: _value,
             _quotePrecision: _quotePrecision,
             _oracle: _oracle,
             _oraclePrecision: _oraclePrecision,
-            _oracleTimestampTolerance: _oracleTimestampTolerance
+            _oracleTimestampTolerance: _oracleTimestampTolerance,
+            _oracleQuotedInValueAsset: _oracleQuotedInValueAsset
         });
     }
 
@@ -75,14 +79,16 @@ contract ValueHelpersLibHarness {
         uint256 _basePrecision,
         address _oracle,
         uint256 _oraclePrecision,
-        uint256 _oracleTimestampTolerance
+        uint256 _oracleTimestampTolerance,
+        bool _oracleQuotedInValueAsset
     ) external view returns (uint256 value_) {
         return ValueHelpersLib.convertToValueAssetWithAggregatorV3({
             _baseAmount: _baseAmount,
             _basePrecision: _basePrecision,
             _oracle: _oracle,
             _oraclePrecision: _oraclePrecision,
-            _oracleTimestampTolerance: _oracleTimestampTolerance
+            _oracleTimestampTolerance: _oracleTimestampTolerance,
+            _oracleQuotedInValueAsset: _oracleQuotedInValueAsset
         });
     }
 
@@ -92,7 +98,8 @@ contract ValueHelpersLibHarness {
         uint256 _quotePrecision,
         address _oracle,
         uint256 _oraclePrecision,
-        uint256 _oracleTimestampTolerance
+        uint256 _oracleTimestampTolerance,
+        bool _oracleQuotedInBase
     ) external view returns (uint256 quoteAmount_) {
         return ValueHelpersLib.convertWithAggregatorV3({
             _baseAmount: _baseAmount,
@@ -100,7 +107,8 @@ contract ValueHelpersLibHarness {
             _quotePrecision: _quotePrecision,
             _oracle: _oracle,
             _oraclePrecision: _oraclePrecision,
-            _oracleTimestampTolerance: _oracleTimestampTolerance
+            _oracleTimestampTolerance: _oracleTimestampTolerance,
+            _oracleQuotedInBase: _oracleQuotedInBase
         });
     }
 

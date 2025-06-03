@@ -11,7 +11,6 @@
 
 pragma solidity ^0.8.0;
 
-uint256 constant DEFAULT_SHARE_PRICE = VALUE_ASSET_PRECISION;
 uint256 constant ONE_HUNDRED_PERCENT_BPS = 10_000;
 uint256 constant SECONDS_IN_YEAR = 31557600; // 60*60*24*365.25
 uint256 constant SHARES_PRECISION = 10 ** 18;

@@ -11,15 +11,11 @@
 
 pragma solidity 0.8.28;
 
-import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-
 import {ERC7540LikeIssuanceBase} from "src/components/issuance/utils/ERC7540LikeIssuanceBase.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {Shares} from "src/shares/Shares.sol";
 
 import {ERC7540LikeIssuanceBaseHarness} from "test/harnesses/ERC7540LikeIssuanceBaseHarness.sol";
-import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
 
 contract ERC7540LikeIssuanceBaseTest is TestHelpers {
@@ -46,7 +42,7 @@ contract ERC7540LikeIssuanceBaseTest is TestHelpers {
 
     function test_setAsset_fail_notAdminOrOwner() public {
         address randomUser = makeAddr("randomUser");
-        address asset = address(new MockERC20(18));
+        address asset = makeAddr("asset");
 
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
@@ -55,7 +51,7 @@ contract ERC7540LikeIssuanceBaseTest is TestHelpers {
     }
 
     function test_setAsset_fail_alreadySet() public {
-        address asset = address(new MockERC20(18));
+        address asset = makeAddr("asset");
 
         vm.prank(admin);
         issuanceBase.setAsset(asset);
@@ -67,8 +63,7 @@ contract ERC7540LikeIssuanceBaseTest is TestHelpers {
     }
 
     function test_setAsset_success() public {
-        uint8 decimals = 8;
-        address asset = address(new MockERC20(decimals));
+        address asset = makeAddr("asset");
 
         vm.expectEmit();
         emit ERC7540LikeIssuanceBase.AssetSet({asset: asset});
@@ -76,39 +71,7 @@ contract ERC7540LikeIssuanceBaseTest is TestHelpers {
         vm.prank(admin);
         issuanceBase.setAsset(asset);
 
-        ERC7540LikeIssuanceBase.AssetInfo memory assetInfo = issuanceBase.getAssetInfo();
-        assertEq(assetInfo.asset, asset);
-        assertEq(assetInfo.assetDecimals, decimals);
-        // IERC4626
         assertEq(issuanceBase.asset(), asset);
-    }
-
-    function test_setAssetOracle_fail_notAdminOrOwner() public {
-        address randomUser = makeAddr("randomUser");
-        address oracle = address(new MockChainlinkAggregator(18));
-
-        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        issuanceBase.setAssetOracle(oracle, 0);
-    }
-
-    function test_setAssetOracle_success() public {
-        uint8 oracleDecimals = 7;
-        address oracle = address(new MockChainlinkAggregator(oracleDecimals));
-        uint24 timestampTolerance = 100;
-
-        vm.expectEmit();
-        emit ERC7540LikeIssuanceBase.AssetOracleSet({oracle: oracle, timestampTolerance: timestampTolerance});
-
-        vm.prank(admin);
-        issuanceBase.setAssetOracle(oracle, timestampTolerance);
-
-        ERC7540LikeIssuanceBase.OracleInfo memory oracleInfo = issuanceBase.getAssetOracleInfo();
-
-        assertEq(oracleInfo.oracle, oracle);
-        assertEq(oracleInfo.oracleTimestampTolerance, timestampTolerance);
-        assertEq(oracleInfo.oracleDecimals, oracleDecimals);
     }
 
     //==================================================================================================================

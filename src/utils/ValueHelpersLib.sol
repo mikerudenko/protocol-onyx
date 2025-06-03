@@ -53,9 +53,16 @@ library ValueHelpersLib {
         uint256 _basePrecision,
         uint256 _quotePrecision,
         uint256 _rate,
-        uint256 _ratePrecision
+        uint256 _ratePrecision,
+        bool _rateQuotedInBase
     ) internal pure returns (uint256 quoteAmount_) {
-        return (_baseAmount * _rate * _quotePrecision) / (_ratePrecision * _basePrecision);
+        if (_rateQuotedInBase) {
+            // case: base asset-quoted rate
+            return (_baseAmount * _ratePrecision * _quotePrecision) / (_rate * _basePrecision);
+        } else {
+            // case: quote asset-quoted rate
+            return (_baseAmount * _rate * _quotePrecision) / (_ratePrecision * _basePrecision);
+        }
     }
 
     // CHAINLINK AGGREGATOR HELPERS
@@ -65,7 +72,8 @@ library ValueHelpersLib {
         uint256 _quotePrecision,
         address _oracle,
         uint256 _oraclePrecision,
-        uint256 _oracleTimestampTolerance
+        uint256 _oracleTimestampTolerance,
+        bool _oracleQuotedInValueAsset
     ) internal view returns (uint256 quoteAmount_) {
         return convertWithAggregatorV3({
             _baseAmount: _value,
@@ -73,7 +81,8 @@ library ValueHelpersLib {
             _quotePrecision: _quotePrecision,
             _oracle: _oracle,
             _oraclePrecision: _oraclePrecision,
-            _oracleTimestampTolerance: _oracleTimestampTolerance
+            _oracleTimestampTolerance: _oracleTimestampTolerance,
+            _oracleQuotedInBase: _oracleQuotedInValueAsset ? true : false
         });
     }
 
@@ -82,7 +91,8 @@ library ValueHelpersLib {
         uint256 _basePrecision,
         address _oracle,
         uint256 _oraclePrecision,
-        uint256 _oracleTimestampTolerance
+        uint256 _oracleTimestampTolerance,
+        bool _oracleQuotedInValueAsset
     ) internal view returns (uint256 value_) {
         return convertWithAggregatorV3({
             _baseAmount: _baseAmount,
@@ -90,7 +100,8 @@ library ValueHelpersLib {
             _quotePrecision: VALUE_ASSET_PRECISION,
             _oracle: _oracle,
             _oraclePrecision: _oraclePrecision,
-            _oracleTimestampTolerance: _oracleTimestampTolerance
+            _oracleTimestampTolerance: _oracleTimestampTolerance,
+            _oracleQuotedInBase: _oracleQuotedInValueAsset ? false : true
         });
     }
 
@@ -98,9 +109,10 @@ library ValueHelpersLib {
         uint256 _baseAmount,
         uint256 _basePrecision,
         uint256 _quotePrecision,
-        address _oracle,
+        address _oracle, // quoted in
         uint256 _oraclePrecision,
-        uint256 _oracleTimestampTolerance
+        uint256 _oracleTimestampTolerance,
+        bool _oracleQuotedInBase
     ) internal view returns (uint256 quoteAmount_) {
         uint256 oracleRate =
             parseValidatedRateFromAggregatorV3({_aggregator: _oracle, _timestampTolerance: _oracleTimestampTolerance});
@@ -110,7 +122,8 @@ library ValueHelpersLib {
             _basePrecision: _basePrecision,
             _quotePrecision: _quotePrecision,
             _rate: oracleRate,
-            _ratePrecision: _oraclePrecision
+            _ratePrecision: _oraclePrecision,
+            _rateQuotedInBase: _oracleQuotedInBase
         });
     }
 

@@ -60,7 +60,29 @@ contract ValueHelpersLibTest is Test {
         assertEq(valuePerShare, expectedValuePerShare);
     }
 
-    function test_convert_success() public view {
+    function test_convert_success_rateQuotedInBase() public view {
+        // Use different precisions for all
+        uint256 basePrecision = 1e18;
+        uint256 ratePrecision = 1e5;
+        uint256 quotePrecision = 1e7;
+
+        uint256 baseAmount = 15e18; // 15 base units
+        uint256 rate = 5e5; // 5 base units per quote unit
+        uint256 expectedQuoteAmount = 3e7; // 3 quote units
+
+        uint256 quoteAmount = valueHelpersLib.exposed_convert({
+            _baseAmount: baseAmount,
+            _basePrecision: basePrecision,
+            _quotePrecision: quotePrecision,
+            _rate: rate,
+            _ratePrecision: ratePrecision,
+            _rateQuotedInBase: true
+        });
+
+        assertEq(quoteAmount, expectedQuoteAmount);
+    }
+
+    function test_convert_success_rateQuotedInQuote() public view {
         // Use different precisions for all
         uint256 basePrecision = 1e18;
         uint256 ratePrecision = 1e5;
@@ -75,13 +97,94 @@ contract ValueHelpersLibTest is Test {
             _basePrecision: basePrecision,
             _quotePrecision: quotePrecision,
             _rate: rate,
-            _ratePrecision: ratePrecision
+            _ratePrecision: ratePrecision,
+            _rateQuotedInBase: false
         });
 
         assertEq(quoteAmount, expectedQuoteAmount);
     }
 
-    function test_convertWithAggregatorV3_success() public {
+    function test_convertFromValueAssetWithAggregatorV3_success_notQuotedInValueAsset() public {
+        // Use different precisions for all
+        uint256 quotePrecision = 1e7;
+        uint256 oraclePrecision = 1e5;
+        uint8 oracleDecimals = 5;
+
+        uint256 value = 3e18; // 3 value asset units
+        uint256 oracleRate = 5e5; // 5 value units per asset unit
+        uint256 expectedQuoteAmount = 15e7; // 15 quote units
+
+        MockChainlinkAggregator mockAggregator = new MockChainlinkAggregator(oracleDecimals);
+        mockAggregator.setRate(oracleRate);
+        mockAggregator.setTimestamp(block.timestamp);
+
+        uint256 quoteAmount = valueHelpersLib.exposed_convertFromValueAssetWithAggregatorV3({
+            _value: value,
+            _quotePrecision: quotePrecision,
+            _oracle: address(mockAggregator),
+            _oraclePrecision: oraclePrecision,
+            _oracleTimestampTolerance: 0,
+            _oracleQuotedInValueAsset: false
+        });
+
+        assertEq(quoteAmount, expectedQuoteAmount);
+    }
+
+    function test_convertFromValueAssetWithAggregatorV3_success_quotedInValueAsset() public {
+        // Use different precisions for all
+        uint256 quotePrecision = 1e7;
+        uint256 oraclePrecision = 1e5;
+        uint8 oracleDecimals = 5;
+
+        uint256 value = 15e18; // 15 value asset units
+        uint256 oracleRate = 5e5; // 5 value units per asset unit
+        uint256 expectedQuoteAmount = 3e7; // 3 quote units
+
+        MockChainlinkAggregator mockAggregator = new MockChainlinkAggregator(oracleDecimals);
+        mockAggregator.setRate(oracleRate);
+        mockAggregator.setTimestamp(block.timestamp);
+
+        uint256 quoteAmount = valueHelpersLib.exposed_convertFromValueAssetWithAggregatorV3({
+            _value: value,
+            _quotePrecision: quotePrecision,
+            _oracle: address(mockAggregator),
+            _oraclePrecision: oraclePrecision,
+            _oracleTimestampTolerance: 0,
+            _oracleQuotedInValueAsset: true
+        });
+
+        assertEq(quoteAmount, expectedQuoteAmount);
+    }
+
+    function test_convertWithAggregatorV3_success_rateQuotedInBase() public {
+        // Use different precisions for all
+        uint256 basePrecision = 1e18;
+        uint256 quotePrecision = 1e7;
+        uint256 oraclePrecision = 1e5;
+        uint8 oracleDecimals = 5;
+
+        uint256 baseAmount = 15e18; // 15 base units
+        uint256 oracleRate = 5e5; // 5 base units per quote unit
+        uint256 expectedQuoteAmount = 3e7; // 3 quote units
+
+        MockChainlinkAggregator mockAggregator = new MockChainlinkAggregator(oracleDecimals);
+        mockAggregator.setRate(oracleRate);
+        mockAggregator.setTimestamp(block.timestamp);
+
+        uint256 quoteAmount = valueHelpersLib.exposed_convertWithAggregatorV3({
+            _baseAmount: baseAmount,
+            _basePrecision: basePrecision,
+            _quotePrecision: quotePrecision,
+            _oracle: address(mockAggregator),
+            _oraclePrecision: oraclePrecision,
+            _oracleTimestampTolerance: 0,
+            _oracleQuotedInBase: true
+        });
+
+        assertEq(quoteAmount, expectedQuoteAmount);
+    }
+
+    function test_convertWithAggregatorV3_success_rateQuotedInQuote() public {
         // Use different precisions for all
         uint256 basePrecision = 1e18;
         uint256 quotePrecision = 1e7;
@@ -102,7 +205,8 @@ contract ValueHelpersLibTest is Test {
             _quotePrecision: quotePrecision,
             _oracle: address(mockAggregator),
             _oraclePrecision: oraclePrecision,
-            _oracleTimestampTolerance: 0
+            _oracleTimestampTolerance: 0,
+            _oracleQuotedInBase: false
         });
 
         assertEq(quoteAmount, expectedQuoteAmount);

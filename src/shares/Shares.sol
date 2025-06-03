@@ -17,7 +17,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IFeeManager} from "src/interfaces/IFeeManager.sol";
 import {IShareValueHandler} from "src/interfaces/IShareValueHandler.sol";
-import {DEFAULT_SHARE_PRICE} from "src/utils/Constants.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
 
@@ -376,10 +375,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     //==================================================================================================================
 
     function sharePrice() external view returns (uint256 price_, uint256 timestamp_) {
-        uint256 value;
-        (value, timestamp_) = IShareValueHandler(getShareValueHandler()).getShareValue();
+        return IShareValueHandler(getShareValueHandler()).getSharePrice();
+    }
 
-        price_ = value > 0 ? value : DEFAULT_SHARE_PRICE;
+    function shareValue() external view returns (uint256 value_, uint256 timestamp_) {
+        return IShareValueHandler(getShareValueHandler()).getShareValue();
     }
 
     //==================================================================================================================

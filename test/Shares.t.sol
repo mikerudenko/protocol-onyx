@@ -537,17 +537,31 @@ contract SharesTest is Test, TestHelpers {
     // Valuation
     //==================================================================================================================
 
-    function test_sharePrice_success_nonZeroValue() public {
-        __test_sharePrice_success({_shareValue: 123, _expectedSharePrice: 123, _valueTimestamp: 456});
+    function test_sharePrice_success() public {
+        uint256 expectedSharePrice = 123;
+        uint256 expectedTimestamp = 456;
+
+        // Set share value handler
+        address shareValueHandler = makeAddr("shareValueHandler");
+        vm.prank(admin);
+        shares.setShareValueHandler(shareValueHandler);
+
+        shareValueHandler_mockGetSharePrice({
+            _shareValueHandler: shareValueHandler,
+            _sharePrice: expectedSharePrice,
+            _timestamp: expectedTimestamp
+        });
+
+        (uint256 price, uint256 timestamp) = shares.sharePrice();
+
+        assertEq(price, expectedSharePrice);
+        assertEq(timestamp, expectedTimestamp);
     }
 
-    function test_sharePrice_success_zeroValue() public {
-        __test_sharePrice_success({_shareValue: 0, _expectedSharePrice: 1e18, _valueTimestamp: 123});
-    }
+    function test_shareValue_success() public {
+        uint256 expectedSharePrice = 123;
+        uint256 expectedTimestamp = 456;
 
-    function __test_sharePrice_success(uint256 _shareValue, uint256 _expectedSharePrice, uint256 _valueTimestamp)
-        public
-    {
         // Set share value handler
         address shareValueHandler = makeAddr("shareValueHandler");
         vm.prank(admin);
@@ -555,14 +569,14 @@ contract SharesTest is Test, TestHelpers {
 
         shareValueHandler_mockGetShareValue({
             _shareValueHandler: shareValueHandler,
-            _shareValue: _shareValue,
-            _timestamp: _valueTimestamp
+            _shareValue: expectedSharePrice,
+            _timestamp: expectedTimestamp
         });
 
-        (uint256 price, uint256 timestamp) = shares.sharePrice();
+        (uint256 price, uint256 timestamp) = shares.shareValue();
 
-        assertEq(price, _expectedSharePrice);
-        assertEq(timestamp, _valueTimestamp);
+        assertEq(price, expectedSharePrice);
+        assertEq(timestamp, expectedTimestamp);
     }
 
     //==================================================================================================================

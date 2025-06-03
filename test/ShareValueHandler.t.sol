@@ -17,6 +17,8 @@ import {Shares} from "src/shares/Shares.sol";
 import {ShareValueHandler} from "src/components/value/ShareValueHandler.sol";
 
 import {ShareValueHandlerHarness} from "test/harnesses/ShareValueHandlerHarness.sol";
+import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
 
 contract ShareValueHandlerTest is TestHelpers {
@@ -109,6 +111,211 @@ contract ShareValueHandlerTest is TestHelpers {
 
         assertFalse(shareValueHandler.isPositionTracker(trackerToRemove));
         assertEq(shareValueHandler.getPositionTrackers().length, 0);
+    }
+
+    function test_setAssetOracle_fail_notAdminOrOwner() public {
+        address randomUser = makeAddr("randomUser");
+        address asset = makeAddr("oracleAsset");
+        address oracle = address(new MockChainlinkAggregator(18));
+
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        vm.prank(randomUser);
+        shareValueHandler.setAssetOracle({
+            _asset: asset,
+            _oracle: oracle,
+            _quotedInValueAsset: true,
+            _timestampTolerance: 0
+        });
+    }
+
+    function test_setAssetOracle_success() public {
+        uint8 assetDecimals = 12;
+        address asset = address(new MockERC20(assetDecimals));
+        uint8 oracleDecimals = 7;
+        address oracle = address(new MockChainlinkAggregator(oracleDecimals));
+        uint24 timestampTolerance = 100;
+        bool quotedInValueAsset = true;
+
+        vm.expectEmit();
+        emit ShareValueHandler.AssetOracleSet({
+            asset: asset,
+            oracle: oracle,
+            quotedInValueAsset: quotedInValueAsset,
+            timestampTolerance: timestampTolerance
+        });
+
+        vm.prank(admin);
+        shareValueHandler.setAssetOracle({
+            _asset: asset,
+            _oracle: oracle,
+            _quotedInValueAsset: quotedInValueAsset,
+            _timestampTolerance: timestampTolerance
+        });
+
+        ShareValueHandler.AssetOracleInfo memory oracleInfo = shareValueHandler.getAssetOracleInfo({_asset: asset});
+
+        assertEq(oracleInfo.oracle, oracle);
+        assertEq(oracleInfo.timestampTolerance, timestampTolerance);
+        assertEq(oracleInfo.quotedInValueAsset, quotedInValueAsset);
+        assertEq(oracleInfo.oracleDecimals, oracleDecimals);
+        assertEq(oracleInfo.assetDecimals, assetDecimals);
+    }
+
+    function test_unsetAssetOracle_fail_notAdminOrOwner() public {
+        address randomUser = makeAddr("randomUser");
+        address asset = makeAddr("asset");
+
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        vm.prank(randomUser);
+        shareValueHandler.unsetAssetOracle(asset);
+    }
+
+    function test_unsetAssetOracle_success() public {
+        address asset = address(new MockERC20(12));
+        address oracle = address(new MockChainlinkAggregator(7));
+
+        // Set oracle
+        vm.prank(admin);
+        shareValueHandler.setAssetOracle({
+            _asset: asset,
+            _oracle: oracle,
+            _quotedInValueAsset: true,
+            _timestampTolerance: 100
+        });
+
+        vm.expectEmit();
+        emit ShareValueHandler.AssetOracleUnset({asset: asset});
+
+        // Unset oracle
+        vm.prank(admin);
+        shareValueHandler.unsetAssetOracle(asset);
+
+        ShareValueHandler.AssetOracleInfo memory oracleInfo = shareValueHandler.getAssetOracleInfo({_asset: asset});
+        assertEq(oracleInfo.oracle, address(0));
+        assertEq(oracleInfo.timestampTolerance, 0);
+        assertEq(oracleInfo.quotedInValueAsset, false);
+        assertEq(oracleInfo.oracleDecimals, 0);
+        assertEq(oracleInfo.assetDecimals, 0);
+    }
+
+    //==================================================================================================================
+    // Valuation
+    //==================================================================================================================
+
+    function test_convertAssetAmountToValue_success() public {
+        uint8 assetDecimals = 6;
+        uint256 assetAmount = 15e6; // 15 units
+        address asset = address(new MockERC20(assetDecimals));
+
+        uint8 oracleDecimals = 8;
+        uint256 oracleRate = 3e8; // 1 valueAsset : 3 asset
+        bool quotedInValueAsset = false;
+        MockChainlinkAggregator oracle = new MockChainlinkAggregator(oracleDecimals);
+        oracle.setRate(oracleRate);
+        oracle.setTimestamp(block.timestamp);
+
+        uint256 expectedValue = 5e18; // 5 value units
+
+        // Set oracle
+        vm.prank(admin);
+        shareValueHandler.setAssetOracle({
+            _asset: asset,
+            _oracle: address(oracle),
+            _quotedInValueAsset: quotedInValueAsset,
+            _timestampTolerance: 0
+        });
+
+        uint256 actualValue = shareValueHandler.convertAssetAmountToValue({_asset: asset, _assetAmount: assetAmount});
+        assertEq(actualValue, expectedValue);
+    }
+
+    function test_convertValueToAssetAmount_success() public {
+        uint256 value = 5e18; // 5 value units
+
+        uint8 oracleDecimals = 8;
+        uint256 oracleRate = 3e8; // 1 valueAsset : 3 asset
+        bool quotedInValueAsset = false;
+        MockChainlinkAggregator oracle = new MockChainlinkAggregator(oracleDecimals);
+        oracle.setRate(oracleRate);
+        oracle.setTimestamp(block.timestamp);
+
+        uint8 assetDecimals = 6;
+        address asset = address(new MockERC20(assetDecimals));
+        uint256 expectedAssetAmount = 15e6; // 15 units
+
+        // Set oracle
+        vm.prank(admin);
+        shareValueHandler.setAssetOracle({
+            _asset: asset,
+            _oracle: address(oracle),
+            _quotedInValueAsset: quotedInValueAsset,
+            _timestampTolerance: 0
+        });
+
+        uint256 actualAssetAmount = shareValueHandler.convertValueToAssetAmount({_value: value, _asset: asset});
+        assertEq(actualAssetAmount, expectedAssetAmount);
+    }
+
+    function test_getDefaultSharePrice_success() public view {
+        uint256 actualSharePrice = shareValueHandler.getDefaultSharePrice();
+        assertEq(actualSharePrice, 1e18);
+    }
+
+    function test_getSharePrice_success_nonZeroValue() public {
+        __test_getSharePrice_success({_shareValue: 123, _expectedSharePrice: 123, _valueTimestamp: 456});
+    }
+
+    function test_getSharePrice_success_zeroValue() public {
+        __test_getSharePrice_success({_shareValue: 0, _expectedSharePrice: 1e18, _valueTimestamp: 123});
+    }
+
+    function __test_getSharePrice_success(uint256 _shareValue, uint256 _expectedSharePrice, uint256 _valueTimestamp)
+        public
+    {
+        shareValueHandler.harness_setLastShareValue({_shareValue: _shareValue, _timestamp: _valueTimestamp});
+
+        (uint256 actualSharePrice, uint256 actualTimestamp) = shareValueHandler.getSharePrice();
+        assertEq(actualSharePrice, _expectedSharePrice);
+        assertEq(actualTimestamp, _valueTimestamp);
+    }
+
+    function test_getSharePriceAsAssetAmount_success() public {
+        // Warp to arbitrary time
+        vm.warp(12345);
+
+        // Set share value
+        uint256 shareValue = 5e18; // 5 value units
+        uint256 shareValueTimestamp = block.timestamp - 11;
+        shareValueHandler.harness_setLastShareValue({_shareValue: shareValue, _timestamp: shareValueTimestamp});
+
+        // Create oracle
+        uint8 oracleDecimals = 8;
+        uint256 oracleRate = 3e8; // 1 valueAsset : 3 asset
+        bool quotedInValueAsset = false;
+        MockChainlinkAggregator oracle = new MockChainlinkAggregator(oracleDecimals);
+        oracle.setRate(oracleRate);
+        oracle.setTimestamp(block.timestamp);
+
+        // Create asset
+        uint8 assetDecimals = 6;
+        address asset = address(new MockERC20(assetDecimals));
+        uint256 expectedAssetAmount = 15e6; // 15 units
+
+        // Set oracle
+        vm.prank(admin);
+        shareValueHandler.setAssetOracle({
+            _asset: asset,
+            _oracle: address(oracle),
+            _quotedInValueAsset: quotedInValueAsset,
+            _timestampTolerance: 0
+        });
+
+        (uint256 actualAssetAmount, uint256 actualTimestamp) =
+            shareValueHandler.getSharePriceAsAssetAmount({_asset: asset});
+        assertEq(actualAssetAmount, expectedAssetAmount);
+        assertEq(actualTimestamp, shareValueTimestamp);
     }
 
     //==================================================================================================================
