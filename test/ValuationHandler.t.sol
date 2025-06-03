@@ -12,7 +12,7 @@
 pragma solidity 0.8.28;
 
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
-import {IFeeManager} from "src/interfaces/IFeeManager.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 
@@ -341,13 +341,13 @@ contract ValuationHandlerTest is TestHelpers {
             _totalShares: 0,
             _untrackedValue: 0,
             _positionTrackerValues: new int256[](0),
-            _hasFeeManager: true,
+            _hasFeeHandler: true,
             _feesOwed: 0,
             _expectedValuePerShare: 0
         });
     }
 
-    function test_updateShareValue_success_onlyUntrackedValue_noFeeManager() public {
+    function test_updateShareValue_success_onlyUntrackedValue_noFeeHandler() public {
         // Target price: 3e18 (i.e., 3 value units per share)
         uint256 expectedValuePerShare = 3e18;
         uint256 totalShares = 9e6;
@@ -357,7 +357,7 @@ contract ValuationHandlerTest is TestHelpers {
             _totalShares: totalShares,
             _untrackedValue: untrackedValue,
             _positionTrackerValues: new int256[](0),
-            _hasFeeManager: false,
+            _hasFeeHandler: false,
             _feesOwed: 0,
             _expectedValuePerShare: expectedValuePerShare
         });
@@ -384,7 +384,7 @@ contract ValuationHandlerTest is TestHelpers {
             _totalShares: totalShares,
             _untrackedValue: untrackedValue,
             _positionTrackerValues: positionTrackerValues,
-            _hasFeeManager: true,
+            _hasFeeHandler: true,
             _feesOwed: feesOwed,
             _expectedValuePerShare: expectedValuePerShare
         });
@@ -394,17 +394,17 @@ contract ValuationHandlerTest is TestHelpers {
         uint256 _totalShares,
         int256 _untrackedValue,
         int256[] memory _positionTrackerValues,
-        bool _hasFeeManager,
+        bool _hasFeeHandler,
         uint256 _feesOwed,
         uint256 _expectedValuePerShare
     ) internal {
-        // Validate that if there are fees owed, there is also a FeeManager
-        assertTrue(_hasFeeManager || (!_hasFeeManager && _feesOwed == 0), "fees owed but no FeeManager");
+        // Validate that if there are fees owed, there is also a FeeHandler
+        assertTrue(_hasFeeHandler || (!_hasFeeHandler && _feesOwed == 0), "fees owed but no FeeHandler");
 
-        // Add FeeManager if needed
-        address feeManager;
-        if (_hasFeeManager) {
-            feeManager = setMockFeeManager({_shares: address(shares), _totalValueOwed: _feesOwed});
+        // Add FeeHandler if needed
+        address feeHandler;
+        if (_hasFeeHandler) {
+            feeHandler = setMockFeeHandler({_shares: address(shares), _totalValueOwed: _feesOwed});
         }
 
         // Add position trackers if needed
@@ -426,12 +426,12 @@ contract ValuationHandlerTest is TestHelpers {
         uint256 updateTimestamp = 123;
         vm.warp(updateTimestamp);
 
-        if (_hasFeeManager && _totalShares > 0) {
-            // Assert FeeManager is called with expected total positions value
+        if (_hasFeeHandler && _totalShares > 0) {
+            // Assert FeeHandler is called with expected total positions value
             uint256 totalPositionsValue = uint256(_untrackedValue) + uint256(trackedPositionsValue);
 
             vm.expectCall(
-                feeManager, abi.encodeWithSelector(IFeeManager.settleDynamicFees.selector, totalPositionsValue)
+                feeHandler, abi.encodeWithSelector(IFeeHandler.settleDynamicFees.selector, totalPositionsValue)
             );
         }
 

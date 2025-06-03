@@ -11,9 +11,9 @@
 
 pragma solidity ^0.8.0;
 
-/// @title IFeeManager Interface
+/// @title IFeeHandler Interface
 /// @author Enzyme Foundation <security@enzyme.finance>
-interface IFeeManager {
+interface IFeeHandler {
     function getTotalValueOwed() external view returns (uint256 totalValueOwed_);
 
     function settleDynamicFees(uint256 _totalPositionsValue) external;

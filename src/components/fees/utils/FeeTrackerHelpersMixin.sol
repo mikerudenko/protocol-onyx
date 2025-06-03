@@ -18,11 +18,11 @@ import {Shares} from "src/shares/Shares.sol";
 /// @author Enzyme Foundation <security@enzyme.finance>
 /// @notice Mixin of helpers for fee tracker implementations
 abstract contract FeeTrackerHelpersMixin is ComponentHelpersMixin {
-    error FeeTrackerHelpersMixin__OnlyFeeManager__Unauthorized();
+    error FeeTrackerHelpersMixin__OnlyFeeHandler__Unauthorized();
 
-    modifier onlyFeeManager() {
+    modifier onlyFeeHandler() {
         require(
-            msg.sender == Shares(__getShares()).getFeeManager(), FeeTrackerHelpersMixin__OnlyFeeManager__Unauthorized()
+            msg.sender == Shares(__getShares()).getFeeHandler(), FeeTrackerHelpersMixin__OnlyFeeHandler__Unauthorized()
         );
 
         _;

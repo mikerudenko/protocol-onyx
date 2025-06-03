@@ -15,7 +15,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {IFeeManager} from "src/interfaces/IFeeManager.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
@@ -53,7 +53,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         HolderRestriction holderRestriction; // packed with `depositAssetsDest` since they are called together during deposits
         address redeemAssetsSrc;
         address feeAssetsSrc;
-        address feeManager;
+        address feeHandler;
         address valuationHandler;
         mapping(address => bool) isDepositHandler;
         mapping(address => bool) isRedeemHandler;
@@ -90,7 +90,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event FeeAssetsSrcSet(address src);
 
-    event FeeManagerSet(address feeManager);
+    event FeeHandlerSet(address feeHandler);
 
     event HolderRestrictionSet(HolderRestriction holderRestriction);
 
@@ -128,7 +128,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     error Shares__OnlyDepositHandler__Unauthorized();
 
-    error Shares__OnlyFeeManager__Unauthorized();
+    error Shares__OnlyFeeHandler__Unauthorized();
 
     error Shares__OnlyRedeemHandler__Unauthorized();
 
@@ -166,8 +166,8 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         _;
     }
 
-    modifier onlyFeeManager() {
-        require(msg.sender == getFeeManager(), Shares__OnlyFeeManager__Unauthorized());
+    modifier onlyFeeHandler() {
+        require(msg.sender == getFeeHandler(), Shares__OnlyFeeHandler__Unauthorized());
 
         _;
     }
@@ -318,11 +318,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         emit RedeemHandlerRemoved(_handler);
     }
 
-    function setFeeManager(address _feeManager) external onlyAdminOrOwner {
+    function setFeeHandler(address _feeHandler) external onlyAdminOrOwner {
         SharesStorage storage $ = __getSharesStorage();
-        $.feeManager = _feeManager;
+        $.feeHandler = _feeHandler;
 
-        emit FeeManagerSet(_feeManager);
+        emit FeeHandlerSet(_feeHandler);
     }
 
     function setValuationHandler(address _valuationHandler) external onlyAdminOrOwner {
@@ -399,11 +399,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         onlyDepositHandler
         returns (uint256 netSharesAmount_)
     {
-        if (_skipFee || getFeeManager() == address(0)) {
+        if (_skipFee || getFeeHandler() == address(0)) {
             netSharesAmount_ = _grossSharesAmount;
         } else {
             uint256 feeSharesAmount =
-                IFeeManager(getFeeManager()).settleEntranceFee({_grossSharesAmount: _grossSharesAmount});
+                IFeeHandler(getFeeHandler()).settleEntranceFee({_grossSharesAmount: _grossSharesAmount});
             netSharesAmount_ = _grossSharesAmount - feeSharesAmount;
         }
 
@@ -418,11 +418,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         onlyRedeemHandler
         returns (uint256 netSharesAmount_)
     {
-        if (_skipFee || getFeeManager() == address(0)) {
+        if (_skipFee || getFeeHandler() == address(0)) {
             netSharesAmount_ = _grossSharesAmount;
         } else {
             uint256 feeSharesAmount =
-                IFeeManager(getFeeManager()).settleExitFee({_grossSharesAmount: _grossSharesAmount});
+                IFeeHandler(getFeeHandler()).settleExitFee({_grossSharesAmount: _grossSharesAmount});
             netSharesAmount_ = _grossSharesAmount - feeSharesAmount;
         }
 
@@ -436,8 +436,8 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     // FEES FLOW
 
-    /// @dev Callable by: FeeManager
-    function withdrawFeeAssetTo(address _asset, address _to, uint256 _amount) external onlyFeeManager {
+    /// @dev Callable by: FeeHandler
+    function withdrawFeeAssetTo(address _asset, address _to, uint256 _amount) external onlyFeeHandler {
         IERC20(_asset).safeTransferFrom(getFeeAssetsSrc(), _to, _amount);
     }
 
@@ -487,8 +487,8 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         return __getSharesStorage().feeAssetsSrc;
     }
 
-    function getFeeManager() public view returns (address) {
-        return __getSharesStorage().feeManager;
+    function getFeeHandler() public view returns (address) {
+        return __getSharesStorage().feeHandler;
     }
 
     function getHolderRestriction() public view returns (HolderRestriction) {

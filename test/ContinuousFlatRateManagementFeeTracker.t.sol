@@ -28,7 +28,7 @@ contract ContinuousFlatRateManagementFeeTrackerTest is TestHelpers {
     Shares shares;
     address owner;
     address admin = makeAddr("admin");
-    address mockFeeManager = makeAddr("mockFeeManager");
+    address mockFeeHandler = makeAddr("mockFeeHandler");
 
     ContinuousFlatRateManagementFeeTrackerHarness managementFeeTracker;
 
@@ -39,9 +39,9 @@ contract ContinuousFlatRateManagementFeeTrackerTest is TestHelpers {
         vm.prank(owner);
         shares.addAdmin(admin);
 
-        // Set fee manager on Shares
+        // Set fee handler on Shares
         vm.prank(admin);
-        shares.setFeeManager(mockFeeManager);
+        shares.setFeeHandler(mockFeeHandler);
 
         managementFeeTracker = new ContinuousFlatRateManagementFeeTrackerHarness({_shares: address(shares)});
     }
@@ -103,10 +103,10 @@ contract ContinuousFlatRateManagementFeeTrackerTest is TestHelpers {
     // Settlement
     //==================================================================================================================
 
-    function test_settleManagementFee_fail_onlyFeeManager() public {
+    function test_settleManagementFee_fail_onlyFeeHandler() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(FeeTrackerHelpersMixin.FeeTrackerHelpersMixin__OnlyFeeManager__Unauthorized.selector);
+        vm.expectRevert(FeeTrackerHelpersMixin.FeeTrackerHelpersMixin__OnlyFeeHandler__Unauthorized.selector);
 
         vm.prank(randomUser);
         managementFeeTracker.settleManagementFee({_netValue: 0});
@@ -119,7 +119,7 @@ contract ContinuousFlatRateManagementFeeTrackerTest is TestHelpers {
                 .selector
         );
 
-        vm.prank(mockFeeManager);
+        vm.prank(mockFeeHandler);
         managementFeeTracker.settleManagementFee({_netValue: 0});
     }
 
@@ -147,7 +147,7 @@ contract ContinuousFlatRateManagementFeeTrackerTest is TestHelpers {
         vm.expectEmit();
         emit ContinuousFlatRateManagementFeeTracker.Settled({valueDue: expectedValueDue});
 
-        vm.prank(mockFeeManager);
+        vm.prank(mockFeeHandler);
         uint256 valueDue = managementFeeTracker.settleManagementFee({_netValue: netValue});
 
         assertEq(valueDue, expectedValueDue);

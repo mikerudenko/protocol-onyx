@@ -84,7 +84,7 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
     // Settlement
     //==================================================================================================================
 
-    function settleManagementFee(uint256 _netValue) external onlyFeeManager returns (uint256 valueDue_) {
+    function settleManagementFee(uint256 _netValue) external onlyFeeHandler returns (uint256 valueDue_) {
         uint256 lastSettled = getLastSettled();
         require(
             lastSettled > 0, ContinuousFlatRateManagementFeeTracker__SettleManagementFee__LastSettledNotInitialized()

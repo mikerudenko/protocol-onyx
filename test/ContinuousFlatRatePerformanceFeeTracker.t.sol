@@ -28,7 +28,7 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
     Shares shares;
     address owner;
     address admin = makeAddr("admin");
-    address mockFeeManager = makeAddr("mockFeeManager");
+    address mockFeeHandler = makeAddr("mockFeeHandler");
 
     ContinuousFlatRatePerformanceFeeTrackerHarness performanceFeeTracker;
 
@@ -39,9 +39,9 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
         vm.prank(owner);
         shares.addAdmin(admin);
 
-        // Set fee manager on Shares
+        // Set fee handler on Shares
         vm.prank(admin);
-        shares.setFeeManager(mockFeeManager);
+        shares.setFeeHandler(mockFeeHandler);
 
         performanceFeeTracker = new ContinuousFlatRatePerformanceFeeTrackerHarness({_shares: address(shares)});
     }
@@ -94,10 +94,10 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
     // Settlement
     //==================================================================================================================
 
-    function test_settlePerformanceFee_fail_onlyFeeManager() public {
+    function test_settlePerformanceFee_fail_onlyFeeHandler() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(FeeTrackerHelpersMixin.FeeTrackerHelpersMixin__OnlyFeeManager__Unauthorized.selector);
+        vm.expectRevert(FeeTrackerHelpersMixin.FeeTrackerHelpersMixin__OnlyFeeHandler__Unauthorized.selector);
 
         vm.prank(randomUser);
         performanceFeeTracker.settlePerformanceFee({_netValue: 0});
@@ -110,7 +110,7 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
                 .selector
         );
 
-        vm.prank(mockFeeManager);
+        vm.prank(mockFeeHandler);
         performanceFeeTracker.settlePerformanceFee({_netValue: 0});
     }
 
@@ -220,7 +220,7 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
             emit ContinuousFlatRatePerformanceFeeTracker.Settled({valueDue: _expectedValueDue});
         }
 
-        vm.prank(mockFeeManager);
+        vm.prank(mockFeeHandler);
         uint256 valueDue = performanceFeeTracker.settlePerformanceFee({_netValue: _netValue});
 
         assertEq(valueDue, _expectedValueDue);

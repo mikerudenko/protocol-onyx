@@ -18,19 +18,19 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IChainlinkAggregator} from "src/interfaces/external/IChainlinkAggregator.sol";
 import {IManagementFeeTracker} from "src/components/fees/interfaces/IManagementFeeTracker.sol";
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
-import {FeeManager} from "src/components/fees/FeeManager.sol";
+import {FeeHandler} from "src/components/fees/FeeHandler.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
-import {FeeManagerHarness} from "test/harnesses/FeeManagerHarness.sol";
+import {FeeHandlerHarness} from "test/harnesses/FeeHandlerHarness.sol";
 import {ValuationHandlerHarness} from "test/harnesses/ValuationHandlerHarness.sol";
 import {BlankManagementFeeTracker, BlankPerformanceFeeTracker} from "test/mocks/Blanks.sol";
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
 
-contract FeeManagerTestHelpers is TestHelpers {
+contract FeeHandlerTestHelpers is TestHelpers {
     function managementFeeTracker_mockSettleManagementFee(address _managementFeeTracker, uint256 _valueDue) internal {
         vm.mockCall(_managementFeeTracker, IManagementFeeTracker.settleManagementFee.selector, abi.encode(_valueDue));
     }
@@ -41,7 +41,7 @@ contract FeeManagerTestHelpers is TestHelpers {
         vm.mockCall(_performanceFeeTracker, IPerformanceFeeTracker.settlePerformanceFee.selector, abi.encode(_valueDue));
     }
 
-    function setMockManagementFee(address _feeManager, address _admin)
+    function setMockManagementFee(address _feeHandler, address _admin)
         internal
         returns (address managementFeeTracker_)
     {
@@ -49,10 +49,10 @@ contract FeeManagerTestHelpers is TestHelpers {
         address recipient = makeAddr("setMockManagementFee:recipient");
 
         vm.prank(_admin);
-        FeeManager(_feeManager).setManagementFee({_managementFeeTracker: managementFeeTracker_, _recipient: recipient});
+        FeeHandler(_feeHandler).setManagementFee({_managementFeeTracker: managementFeeTracker_, _recipient: recipient});
     }
 
-    function setMockPerformanceFee(address _feeManager, address _admin)
+    function setMockPerformanceFee(address _feeHandler, address _admin)
         internal
         returns (address performanceFeeTracker_)
     {
@@ -60,20 +60,20 @@ contract FeeManagerTestHelpers is TestHelpers {
         address recipient = makeAddr("setMockPerformanceFee:recipient");
 
         vm.prank(_admin);
-        FeeManager(_feeManager).setPerformanceFee({
+        FeeHandler(_feeHandler).setPerformanceFee({
             _performanceFeeTracker: performanceFeeTracker_,
             _recipient: recipient
         });
     }
 }
 
-contract FeeManagerTest is Test, FeeManagerTestHelpers {
+contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
     Shares shares;
     address owner;
-    address admin = makeAddr("FeeManagerTest.admin");
+    address admin = makeAddr("FeeHandlerTest.admin");
     ValuationHandler valuationHandler;
 
-    FeeManagerHarness feeManager;
+    FeeHandlerHarness feeHandler;
 
     function setUp() public {
         shares = createShares();
@@ -82,10 +82,10 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.prank(owner);
         shares.addAdmin(admin);
 
-        // Deploy FeeManager and set it on Shares
-        feeManager = new FeeManagerHarness(address(shares));
+        // Deploy FeeHandler and set it on Shares
+        feeHandler = new FeeHandlerHarness(address(shares));
         vm.prank(admin);
-        shares.setFeeManager(address(feeManager));
+        shares.setFeeHandler(address(feeHandler));
 
         // Create a mock ValuationHandler and set it on Shares
         valuationHandler = ValuationHandler(address(new ValuationHandlerHarness(address(shares))));
@@ -103,21 +103,21 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.setEntranceFee({_feeBps: 0, _recipient: address(0)});
+        feeHandler.setEntranceFee({_feeBps: 0, _recipient: address(0)});
     }
 
     function test_setEntranceFee_success() public {
         uint16 feeBps = 123;
         address recipient = makeAddr("test_setEntranceFee:recipient");
 
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.EntranceFeeSet({feeBps: feeBps, recipient: recipient});
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.EntranceFeeSet({feeBps: feeBps, recipient: recipient});
 
         vm.prank(admin);
-        feeManager.setEntranceFee({_feeBps: feeBps, _recipient: recipient});
+        feeHandler.setEntranceFee({_feeBps: feeBps, _recipient: recipient});
 
-        assertEq(feeManager.getEntranceFeeBps(), feeBps);
-        assertEq(feeManager.getEntranceFeeRecipient(), recipient);
+        assertEq(feeHandler.getEntranceFeeBps(), feeBps);
+        assertEq(feeHandler.getEntranceFeeRecipient(), recipient);
     }
 
     function test_setExitFee_fail_unauthorized() public {
@@ -126,21 +126,21 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.setExitFee({_feeBps: 0, _recipient: address(0)});
+        feeHandler.setExitFee({_feeBps: 0, _recipient: address(0)});
     }
 
     function test_setExitFee_success() public {
         uint16 feeBps = 123;
         address recipient = makeAddr("test_setExitFee:recipient");
 
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.ExitFeeSet({feeBps: feeBps, recipient: recipient});
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.ExitFeeSet({feeBps: feeBps, recipient: recipient});
 
         vm.prank(admin);
-        feeManager.setExitFee({_feeBps: feeBps, _recipient: recipient});
+        feeHandler.setExitFee({_feeBps: feeBps, _recipient: recipient});
 
-        assertEq(feeManager.getExitFeeBps(), feeBps);
-        assertEq(feeManager.getExitFeeRecipient(), recipient);
+        assertEq(feeHandler.getExitFeeBps(), feeBps);
+        assertEq(feeHandler.getExitFeeRecipient(), recipient);
     }
 
     function test_setFeeAsset_fail_unauthorized() public {
@@ -149,19 +149,19 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.setFeeAsset({_asset: address(0)});
+        feeHandler.setFeeAsset({_asset: address(0)});
     }
 
     function test_setFeeAsset_success() public {
         address feeAsset = makeAddr("feeAsset");
 
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.FeeAssetSet({asset: feeAsset});
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.FeeAssetSet({asset: feeAsset});
 
         vm.prank(admin);
-        feeManager.setFeeAsset({_asset: feeAsset});
+        feeHandler.setFeeAsset({_asset: feeAsset});
 
-        assertEq(feeManager.getFeeAsset(), feeAsset);
+        assertEq(feeHandler.getFeeAsset(), feeAsset);
     }
 
     function test_setManagementFee_fail_unauthorized() public {
@@ -170,21 +170,21 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.setManagementFee({_managementFeeTracker: address(0), _recipient: address(0)});
+        feeHandler.setManagementFee({_managementFeeTracker: address(0), _recipient: address(0)});
     }
 
     function test_setManagementFee_success() public {
         address managementFeeTracker = makeAddr("test_setManagementFee:managementFeeTracker");
         address recipient = makeAddr("test_setManagementFee:recipient");
 
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.ManagementFeeSet({managementFeeTracker: managementFeeTracker, recipient: recipient});
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.ManagementFeeSet({managementFeeTracker: managementFeeTracker, recipient: recipient});
 
         vm.prank(admin);
-        feeManager.setManagementFee({_managementFeeTracker: managementFeeTracker, _recipient: recipient});
+        feeHandler.setManagementFee({_managementFeeTracker: managementFeeTracker, _recipient: recipient});
 
-        assertEq(feeManager.getManagementFeeTracker(), managementFeeTracker);
-        assertEq(feeManager.getManagementFeeRecipient(), recipient);
+        assertEq(feeHandler.getManagementFeeTracker(), managementFeeTracker);
+        assertEq(feeHandler.getManagementFeeRecipient(), recipient);
     }
 
     function test_setPerformanceFee_fail_unauthorized() public {
@@ -193,21 +193,21 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.setPerformanceFee({_performanceFeeTracker: address(0), _recipient: address(0)});
+        feeHandler.setPerformanceFee({_performanceFeeTracker: address(0), _recipient: address(0)});
     }
 
     function test_setPerformanceFee_success() public {
         address performanceFeeTracker = makeAddr("test_setPerformanceFee:performanceFeeTracker");
         address recipient = makeAddr("test_setPerformanceFee:recipient");
 
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.PerformanceFeeSet({performanceFeeTracker: performanceFeeTracker, recipient: recipient});
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.PerformanceFeeSet({performanceFeeTracker: performanceFeeTracker, recipient: recipient});
 
         vm.prank(admin);
-        feeManager.setPerformanceFee({_performanceFeeTracker: performanceFeeTracker, _recipient: recipient});
+        feeHandler.setPerformanceFee({_performanceFeeTracker: performanceFeeTracker, _recipient: recipient});
 
-        assertEq(feeManager.getPerformanceFeeTracker(), performanceFeeTracker);
-        assertEq(feeManager.getPerformanceFeeRecipient(), recipient);
+        assertEq(feeHandler.getPerformanceFeeTracker(), performanceFeeTracker);
+        assertEq(feeHandler.getPerformanceFeeRecipient(), recipient);
     }
 
     //==================================================================================================================
@@ -218,10 +218,10 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         address owedUser = makeAddr("test_claimFees_fail_unauthorized:owedUser");
         address randomUser = makeAddr("test_claimFees_fail_unauthorized:randomUser");
 
-        vm.expectRevert(FeeManager.FeeManager__ClaimFees__Unauthorized.selector);
+        vm.expectRevert(FeeHandler.FeeHandler__ClaimFees__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.claimFees({_onBehalf: owedUser, _value: 123});
+        feeHandler.claimFees({_onBehalf: owedUser, _value: 123});
     }
 
     function test_claimFees_fail_zeroFeeAssetAmount() public {
@@ -243,12 +243,12 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
 
         // Set the fee asset
         vm.prank(admin);
-        feeManager.setFeeAsset({_asset: feeAsset});
+        feeHandler.setFeeAsset({_asset: feeAsset});
 
-        vm.expectRevert(FeeManager.FeeManager__ClaimFees__ZeroFeeAsset.selector);
+        vm.expectRevert(FeeHandler.FeeHandler__ClaimFees__ZeroFeeAsset.selector);
 
         vm.prank(owedUser);
-        feeManager.claimFees({_onBehalf: owedUser, _value: 0});
+        feeHandler.claimFees({_onBehalf: owedUser, _value: 0});
     }
 
     function test_claimFees_success_calledByAdmin() public {
@@ -273,12 +273,12 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         MockERC20 mockFeeAsset = new MockERC20(feeAssetDecimals);
 
         // Use a mock fee to add to the feeRecipient's value owed by settling the fee
-        address managementFeeTracker = setMockManagementFee({_feeManager: address(feeManager), _admin: admin});
+        address managementFeeTracker = setMockManagementFee({_feeHandler: address(feeHandler), _admin: admin});
         managementFeeTracker_mockSettleManagementFee({_managementFeeTracker: managementFeeTracker, _valueDue: valueDue});
         vm.prank(address(valuationHandler));
-        feeManager.settleDynamicFees({_totalPositionsValue: valueDue * 3});
-        address feeRecipient = feeManager.getManagementFeeRecipient();
-        assertEq(feeManager.getValueOwedToUser(feeRecipient), valueDue);
+        feeHandler.settleDynamicFees({_totalPositionsValue: valueDue * 3});
+        address feeRecipient = feeHandler.getManagementFeeRecipient();
+        assertEq(feeHandler.getValueOwedToUser(feeRecipient), valueDue);
 
         // Create the oracle with conversion rate of value asset to fee asset
         MockChainlinkAggregator mockAggregator = new MockChainlinkAggregator(oracleDecimals);
@@ -294,7 +294,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
 
         // Set the fee asset
         vm.prank(admin);
-        feeManager.setFeeAsset({_asset: address(mockFeeAsset)});
+        feeHandler.setFeeAsset({_asset: address(mockFeeAsset)});
 
         // Set the fee assets src...
         address feeAssetsSrc = makeAddr("test_claimFees:feeAssetsSrc");
@@ -311,13 +311,13 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
 
         // Pre-assert events
         vm.expectEmit();
-        emit FeeManager.UserValueOwedUpdated({user: feeRecipient, value: unclaimedValue});
+        emit FeeHandler.UserValueOwedUpdated({user: feeRecipient, value: unclaimedValue});
 
         vm.expectEmit();
-        emit FeeManager.TotalValueOwedUpdated({value: unclaimedValue});
+        emit FeeHandler.TotalValueOwedUpdated({value: unclaimedValue});
 
         vm.expectEmit();
-        emit FeeManager.FeesClaimed({
+        emit FeeHandler.FeesClaimed({
             caller: caller,
             onBehalf: feeRecipient,
             value: valueToClaim,
@@ -327,11 +327,11 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
 
         // Claim the fees
         vm.prank(caller);
-        uint256 feeAssetAmount = feeManager.claimFees({_onBehalf: feeRecipient, _value: valueToClaim});
+        uint256 feeAssetAmount = feeHandler.claimFees({_onBehalf: feeRecipient, _value: valueToClaim});
 
         // Check that the value was deducted from user and total fees owed
-        assertEq(feeManager.getValueOwedToUser(feeRecipient), unclaimedValue);
-        assertEq(feeManager.getTotalValueOwed(), unclaimedValue);
+        assertEq(feeHandler.getValueOwedToUser(feeRecipient), unclaimedValue);
+        assertEq(feeHandler.getTotalValueOwed(), unclaimedValue);
 
         // Check that the user received the correct amount of fee asset give the conversion rate
         assertEq(feeAssetAmount, expectedFeeAssetAmount);
@@ -345,17 +345,17 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
     function test_settleDynamicFees_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(FeeManager.FeeManager__SettleDynamicFees__Unauthorized.selector);
+        vm.expectRevert(FeeHandler.FeeHandler__SettleDynamicFees__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.settleDynamicFees(0);
+        feeHandler.settleDynamicFees(0);
     }
 
     function test_settleDynamicFees_success_noFees() public {
         vm.prank(address(valuationHandler));
-        feeManager.settleDynamicFees({_totalPositionsValue: 123});
+        feeHandler.settleDynamicFees({_totalPositionsValue: 123});
 
-        assertEq(feeManager.getTotalValueOwed(), 0);
+        assertEq(feeHandler.getTotalValueOwed(), 0);
     }
 
     function test_settleDynamicFees_success_managementFeeOnly() public {
@@ -363,7 +363,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         uint256 totalPositionsValue = feeValueDue * 7;
 
         // Create mock ManagementFeeTracker and set the fee value due
-        address managementFeeTracker = setMockManagementFee({_feeManager: address(feeManager), _admin: admin});
+        address managementFeeTracker = setMockManagementFee({_feeHandler: address(feeHandler), _admin: admin});
         managementFeeTracker_mockSettleManagementFee({
             _managementFeeTracker: managementFeeTracker,
             _valueDue: feeValueDue
@@ -374,14 +374,14 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
             data: abi.encodeCall(IManagementFeeTracker.settleManagementFee, (totalPositionsValue))
         });
 
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.ManagementFeeSettled({recipient: feeManager.getManagementFeeRecipient(), value: feeValueDue});
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.ManagementFeeSettled({recipient: feeHandler.getManagementFeeRecipient(), value: feeValueDue});
 
         vm.prank(address(valuationHandler));
-        feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+        feeHandler.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
-        assertEq(feeManager.getTotalValueOwed(), feeValueDue);
-        assertEq(feeManager.getValueOwedToUser(feeManager.getManagementFeeRecipient()), feeValueDue);
+        assertEq(feeHandler.getTotalValueOwed(), feeValueDue);
+        assertEq(feeHandler.getValueOwedToUser(feeHandler.getManagementFeeRecipient()), feeValueDue);
     }
 
     function test_settleDynamicFees_success_performanceFeeOnly() public {
@@ -389,7 +389,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         uint256 totalPositionsValue = feeValueDue * 7;
 
         // Create mock PerformanceFeeTracker and set the fee value due
-        address performanceFeeTracker = setMockPerformanceFee({_feeManager: address(feeManager), _admin: admin});
+        address performanceFeeTracker = setMockPerformanceFee({_feeHandler: address(feeHandler), _admin: admin});
         performanceFeeTracker_mockSettlePerformanceFee({
             _performanceFeeTracker: performanceFeeTracker,
             _valueDue: feeValueDue
@@ -400,14 +400,14 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
             data: abi.encodeCall(IPerformanceFeeTracker.settlePerformanceFee, (totalPositionsValue))
         });
 
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.PerformanceFeeSettled({recipient: feeManager.getPerformanceFeeRecipient(), value: feeValueDue});
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.PerformanceFeeSettled({recipient: feeHandler.getPerformanceFeeRecipient(), value: feeValueDue});
 
         vm.prank(address(valuationHandler));
-        feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+        feeHandler.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
-        assertEq(feeManager.getTotalValueOwed(), feeValueDue);
-        assertEq(feeManager.getValueOwedToUser(feeManager.getPerformanceFeeRecipient()), feeValueDue);
+        assertEq(feeHandler.getTotalValueOwed(), feeValueDue);
+        assertEq(feeHandler.getValueOwedToUser(feeHandler.getPerformanceFeeRecipient()), feeValueDue);
     }
 
     function test_settleDynamicFees_success_bothFees() public {
@@ -416,14 +416,14 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         uint256 totalPositionsValue = (managementFeeValueDue + performanceFeeValueDue) * 7;
 
         // Create mock ManagementFeeTracker and set the fee value due
-        address managementFeeTracker = setMockManagementFee({_feeManager: address(feeManager), _admin: admin});
+        address managementFeeTracker = setMockManagementFee({_feeHandler: address(feeHandler), _admin: admin});
         managementFeeTracker_mockSettleManagementFee({
             _managementFeeTracker: managementFeeTracker,
             _valueDue: managementFeeValueDue
         });
 
         // Create mock PerformanceFeeTracker and set the fee value due
-        address performanceFeeTracker = setMockPerformanceFee({_feeManager: address(feeManager), _admin: admin});
+        address performanceFeeTracker = setMockPerformanceFee({_feeHandler: address(feeHandler), _admin: admin});
         performanceFeeTracker_mockSettlePerformanceFee({
             _performanceFeeTracker: performanceFeeTracker,
             _valueDue: performanceFeeValueDue
@@ -442,25 +442,25 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
             });
         }
 
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.ManagementFeeSettled({
-            recipient: feeManager.getManagementFeeRecipient(),
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.ManagementFeeSettled({
+            recipient: feeHandler.getManagementFeeRecipient(),
             value: managementFeeValueDue
         });
-        vm.expectEmit(address(feeManager));
-        emit FeeManager.PerformanceFeeSettled({
-            recipient: feeManager.getPerformanceFeeRecipient(),
+        vm.expectEmit(address(feeHandler));
+        emit FeeHandler.PerformanceFeeSettled({
+            recipient: feeHandler.getPerformanceFeeRecipient(),
             value: performanceFeeValueDue
         });
 
         vm.prank(address(valuationHandler));
-        feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+        feeHandler.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
         uint256 totalValueOwedAfter1stSettlement = managementFeeValueDue + performanceFeeValueDue;
 
-        assertEq(feeManager.getTotalValueOwed(), totalValueOwedAfter1stSettlement);
-        assertEq(feeManager.getValueOwedToUser(feeManager.getManagementFeeRecipient()), managementFeeValueDue);
-        assertEq(feeManager.getValueOwedToUser(feeManager.getPerformanceFeeRecipient()), performanceFeeValueDue);
+        assertEq(feeHandler.getTotalValueOwed(), totalValueOwedAfter1stSettlement);
+        assertEq(feeHandler.getValueOwedToUser(feeHandler.getManagementFeeRecipient()), managementFeeValueDue);
+        assertEq(feeHandler.getValueOwedToUser(feeHandler.getPerformanceFeeRecipient()), performanceFeeValueDue);
 
         // Do a 2nd round of settling fees to test that they are additive
 
@@ -481,11 +481,11 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         }
 
         vm.prank(address(valuationHandler));
-        feeManager.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+        feeHandler.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
 
-        assertEq(feeManager.getTotalValueOwed(), 2 * totalValueOwedAfter1stSettlement);
-        assertEq(feeManager.getValueOwedToUser(feeManager.getManagementFeeRecipient()), 2 * managementFeeValueDue);
-        assertEq(feeManager.getValueOwedToUser(feeManager.getPerformanceFeeRecipient()), 2 * performanceFeeValueDue);
+        assertEq(feeHandler.getTotalValueOwed(), 2 * totalValueOwedAfter1stSettlement);
+        assertEq(feeHandler.getValueOwedToUser(feeHandler.getManagementFeeRecipient()), 2 * managementFeeValueDue);
+        assertEq(feeHandler.getValueOwedToUser(feeHandler.getPerformanceFeeRecipient()), 2 * performanceFeeValueDue);
     }
 
     function test_settleEntranceFee_fail_unauthorized() public {
@@ -494,7 +494,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyShares__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.settleEntranceFee(0);
+        feeHandler.settleEntranceFee(0);
     }
 
     function test_settleEntranceFee_success_burn() public {
@@ -511,7 +511,7 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyShares__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeManager.settleExitFee(0);
+        feeHandler.settleExitFee(0);
     }
 
     function test_settleExitFee_success_burn() public {
@@ -536,35 +536,35 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         // Set the fee
         vm.prank(admin);
         if (_entrance) {
-            feeManager.setEntranceFee({_feeBps: feeBps, _recipient: feeRecipient});
+            feeHandler.setEntranceFee({_feeBps: feeBps, _recipient: feeRecipient});
         } else {
-            feeManager.setExitFee({_feeBps: feeBps, _recipient: feeRecipient});
+            feeHandler.setExitFee({_feeBps: feeBps, _recipient: feeRecipient});
         }
 
         // Event returns the value amount (not shares)
-        vm.expectEmit(address(feeManager));
+        vm.expectEmit(address(feeHandler));
         if (_entrance) {
-            emit FeeManager.EntranceFeeSettled({recipient: feeRecipient, value: expectedFeevalue});
+            emit FeeHandler.EntranceFeeSettled({recipient: feeRecipient, value: expectedFeevalue});
         } else {
-            emit FeeManager.ExitFeeSettled({recipient: feeRecipient, value: expectedFeevalue});
+            emit FeeHandler.ExitFeeSettled({recipient: feeRecipient, value: expectedFeevalue});
         }
 
         // 1st settlement
         vm.prank(address(shares));
         uint256 feeSharesAmount;
         if (_entrance) {
-            feeSharesAmount = feeManager.settleEntranceFee({_grossSharesAmount: grossSharesAmount});
+            feeSharesAmount = feeHandler.settleEntranceFee({_grossSharesAmount: grossSharesAmount});
         } else {
-            feeSharesAmount = feeManager.settleExitFee({_grossSharesAmount: grossSharesAmount});
+            feeSharesAmount = feeHandler.settleExitFee({_grossSharesAmount: grossSharesAmount});
         }
 
         // Return value is the shares amount, but value owed is in value asset
         assertEq(feeSharesAmount, expectedFeeSharesAmount);
         if (_burn) {
-            assertEq(feeManager.getTotalValueOwed(), 0);
+            assertEq(feeHandler.getTotalValueOwed(), 0);
         } else {
-            assertEq(feeManager.getTotalValueOwed(), expectedFeevalue);
-            assertEq(feeManager.getValueOwedToUser(feeRecipient), expectedFeevalue);
+            assertEq(feeHandler.getTotalValueOwed(), expectedFeevalue);
+            assertEq(feeHandler.getValueOwedToUser(feeRecipient), expectedFeevalue);
         }
     }
 
@@ -587,22 +587,22 @@ contract FeeManagerTest is Test, FeeManagerTestHelpers {
         uint256 randomOwedUserValue = _initialOwedUserValue * 6;
         uint256 initialTotalValue = _initialOwedUserValue + randomOwedUserValue;
 
-        feeManager.exposed_updateValueOwed({_user: owedUser, _delta: int256(_initialOwedUserValue)});
-        feeManager.exposed_updateValueOwed({_user: randomOwedUser, _delta: int256(randomOwedUserValue)});
+        feeHandler.exposed_updateValueOwed({_user: owedUser, _delta: int256(_initialOwedUserValue)});
+        feeHandler.exposed_updateValueOwed({_user: randomOwedUser, _delta: int256(randomOwedUserValue)});
 
         uint256 expectedOwedUserValue = uint256(int256(_initialOwedUserValue) + _delta);
         uint256 expectedTotalValue = uint256(int256(initialTotalValue) + _delta);
 
         vm.expectEmit();
-        emit FeeManager.UserValueOwedUpdated({user: owedUser, value: expectedOwedUserValue});
+        emit FeeHandler.UserValueOwedUpdated({user: owedUser, value: expectedOwedUserValue});
 
         vm.expectEmit();
-        emit FeeManager.TotalValueOwedUpdated({value: expectedTotalValue});
+        emit FeeHandler.TotalValueOwedUpdated({value: expectedTotalValue});
 
-        vm.prank(address(feeManager));
-        feeManager.exposed_updateValueOwed({_user: owedUser, _delta: _delta});
+        vm.prank(address(feeHandler));
+        feeHandler.exposed_updateValueOwed({_user: owedUser, _delta: _delta});
 
-        assertEq(feeManager.getValueOwedToUser(owedUser), expectedOwedUserValue);
-        assertEq(feeManager.getTotalValueOwed(), expectedTotalValue);
+        assertEq(feeHandler.getValueOwedToUser(owedUser), expectedOwedUserValue);
+        assertEq(feeHandler.getTotalValueOwed(), expectedTotalValue);
     }
 }

@@ -15,10 +15,10 @@ import {Test} from "forge-std/Test.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import {IFeeManager} from "src/interfaces/IFeeManager.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
-import {BlankFeeManager} from "test/mocks/Blanks.sol";
+import {BlankFeeHandler} from "test/mocks/Blanks.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
 
@@ -396,26 +396,26 @@ contract SharesTest is Test, TestHelpers {
         assertFalse(shares.isRedeemHandler(newRedeemHandler));
     }
 
-    function test_setFeeManager_fail_unauthorized() public {
+    function test_setFeeHandler_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
-        address newFeeManager = makeAddr("newFeeManager");
+        address newFeeHandler = makeAddr("newFeeHandler");
 
         vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shares.setFeeManager(newFeeManager);
+        shares.setFeeHandler(newFeeHandler);
     }
 
-    function test_setFeeManager_success() public {
-        address newFeeManager = makeAddr("newFeeManager");
+    function test_setFeeHandler_success() public {
+        address newFeeHandler = makeAddr("newFeeHandler");
 
         vm.expectEmit(address(shares));
-        emit Shares.FeeManagerSet(newFeeManager);
+        emit Shares.FeeHandlerSet(newFeeHandler);
 
         vm.prank(admin);
-        shares.setFeeManager(newFeeManager);
+        shares.setFeeHandler(newFeeHandler);
 
-        assertEq(shares.getFeeManager(), newFeeManager);
+        assertEq(shares.getFeeHandler(), newFeeHandler);
     }
 
     function test_setValuationHandler_fail_unauthorized() public {
@@ -874,38 +874,38 @@ contract SharesTest is Test, TestHelpers {
         shares.mintFor({_to: address(0), _grossSharesAmount: 0, _skipFee: false});
     }
 
-    function test_mintFor_success_noFeeManager() public {
-        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeManager: false, _skipFee: false});
+    function test_mintFor_success_noFeeHandler() public {
+        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: false, _skipFee: false});
     }
 
     function test_mintFor_success_skipFee() public {
-        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeManager: true, _skipFee: true});
+        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: true, _skipFee: true});
     }
 
     function test_mintFor_success_withFee() public {
-        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeManager: true, _skipFee: false});
+        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: true, _skipFee: false});
     }
 
     function __test_mintFor_success(
         uint256 _grossSharesAmount,
         uint256 _feeSharesAmount,
-        bool _hasFeeManager,
+        bool _hasFeeHandler,
         bool _skipFee
     ) internal {
         uint256 expectedNetSharesAmount =
-            _skipFee || !_hasFeeManager ? _grossSharesAmount : _grossSharesAmount - _feeSharesAmount;
+            _skipFee || !_hasFeeHandler ? _grossSharesAmount : _grossSharesAmount - _feeSharesAmount;
 
         address to = makeAddr("mintFor:to");
         address depositHandler = makeAddr("mintFor:depositHandler");
         vm.prank(owner);
         shares.addDepositHandler(depositHandler);
 
-        if (_hasFeeManager) {
-            IFeeManager feeManager = new BlankFeeManager();
+        if (_hasFeeHandler) {
+            IFeeHandler feeHandler = new BlankFeeHandler();
             vm.prank(owner);
-            shares.setFeeManager(address(feeManager));
+            shares.setFeeHandler(address(feeHandler));
 
-            feeManager_mockSettleEntranceFee({_feeManager: address(feeManager), _feeSharesAmount: _feeSharesAmount});
+            feeHandler_mockSettleEntranceFee({_feeHandler: address(feeHandler), _feeSharesAmount: _feeSharesAmount});
         }
 
         vm.prank(depositHandler);
@@ -925,26 +925,26 @@ contract SharesTest is Test, TestHelpers {
         shares.burnFor({_from: address(0), _grossSharesAmount: 0, _skipFee: false});
     }
 
-    function test_burnFor_success_noFeeManager() public {
-        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeManager: false, _skipFee: false});
+    function test_burnFor_success_noFeeHandler() public {
+        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: false, _skipFee: false});
     }
 
     function test_burnFor_success_skipFee() public {
-        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeManager: true, _skipFee: true});
+        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: true, _skipFee: true});
     }
 
     function test_burnFor_success_withFee() public {
-        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeManager: true, _skipFee: false});
+        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: true, _skipFee: false});
     }
 
     function __test_burnFor_success(
         uint256 _grossSharesAmount,
         uint256 _feeSharesAmount,
-        bool _hasFeeManager,
+        bool _hasFeeHandler,
         bool _skipFee
     ) internal {
         uint256 expectedNetSharesAmount =
-            _skipFee || !_hasFeeManager ? _grossSharesAmount : _grossSharesAmount - _feeSharesAmount;
+            _skipFee || !_hasFeeHandler ? _grossSharesAmount : _grossSharesAmount - _feeSharesAmount;
 
         // Mint some shares to `from`
         address from = makeAddr("burnFor:from");
@@ -955,12 +955,12 @@ contract SharesTest is Test, TestHelpers {
         vm.prank(owner);
         shares.addRedeemHandler(redeemHandler);
 
-        if (_hasFeeManager) {
-            IFeeManager feeManager = new BlankFeeManager();
+        if (_hasFeeHandler) {
+            IFeeHandler feeHandler = new BlankFeeHandler();
             vm.prank(owner);
-            shares.setFeeManager(address(feeManager));
+            shares.setFeeHandler(address(feeHandler));
 
-            feeManager_mockSettleExitFee({_feeManager: address(feeManager), _feeSharesAmount: _feeSharesAmount});
+            feeHandler_mockSettleExitFee({_feeHandler: address(feeHandler), _feeSharesAmount: _feeSharesAmount});
         }
 
         vm.prank(redeemHandler);
@@ -1012,7 +1012,7 @@ contract SharesTest is Test, TestHelpers {
     function test_withdrawFeeAssetTo_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(Shares.Shares__OnlyFeeManager__Unauthorized.selector);
+        vm.expectRevert(Shares.Shares__OnlyFeeHandler__Unauthorized.selector);
 
         vm.prank(randomUser);
         shares.withdrawFeeAssetTo({_asset: address(0), _to: address(0), _amount: 0});
@@ -1035,11 +1035,11 @@ contract SharesTest is Test, TestHelpers {
         vm.prank(feeAssetsSrc);
         mockToken.approve(address(shares), type(uint256).max);
 
-        address feeManager = makeAddr("withdrawFeeAssetTo:feeManager");
+        address feeHandler = makeAddr("withdrawFeeAssetTo:feeHandler");
         vm.prank(owner);
-        shares.setFeeManager(address(feeManager));
+        shares.setFeeHandler(address(feeHandler));
 
-        vm.prank(feeManager);
+        vm.prank(feeHandler);
         shares.withdrawFeeAssetTo({_asset: address(mockToken), _to: to, _amount: amount});
 
         assertEq(mockToken.balanceOf(feeAssetsSrc), srcInitialBalance - amount);

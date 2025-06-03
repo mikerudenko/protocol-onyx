@@ -13,12 +13,12 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IFeeManager} from "src/interfaces/IFeeManager.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
 import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 
-import {BlankFeeManager, BlankPositionTracker} from "test/mocks/Blanks.sol";
+import {BlankFeeHandler, BlankPositionTracker} from "test/mocks/Blanks.sol";
 
 contract TestHelpers is Test {
     function createShares() internal returns (Shares shares_) {
@@ -33,16 +33,16 @@ contract TestHelpers is Test {
 
     // MOCKS: FUNCTION CALLS
 
-    function feeManager_mockGetTotalValueOwed(address _feeManager, uint256 _totalValueOwed) internal {
-        vm.mockCall(_feeManager, IFeeManager.getTotalValueOwed.selector, abi.encode(_totalValueOwed));
+    function feeHandler_mockGetTotalValueOwed(address _feeHandler, uint256 _totalValueOwed) internal {
+        vm.mockCall(_feeHandler, IFeeHandler.getTotalValueOwed.selector, abi.encode(_totalValueOwed));
     }
 
-    function feeManager_mockSettleEntranceFee(address _feeManager, uint256 _feeSharesAmount) internal {
-        vm.mockCall(_feeManager, IFeeManager.settleEntranceFee.selector, abi.encode(_feeSharesAmount));
+    function feeHandler_mockSettleEntranceFee(address _feeHandler, uint256 _feeSharesAmount) internal {
+        vm.mockCall(_feeHandler, IFeeHandler.settleEntranceFee.selector, abi.encode(_feeSharesAmount));
     }
 
-    function feeManager_mockSettleExitFee(address _feeManager, uint256 _feeSharesAmount) internal {
-        vm.mockCall(_feeManager, IFeeManager.settleExitFee.selector, abi.encode(_feeSharesAmount));
+    function feeHandler_mockSettleExitFee(address _feeHandler, uint256 _feeSharesAmount) internal {
+        vm.mockCall(_feeHandler, IFeeHandler.settleExitFee.selector, abi.encode(_feeSharesAmount));
     }
 
     function positionTracker_mockGetPositionValue(address _positionTracker, int256 _value) internal {
@@ -73,13 +73,13 @@ contract TestHelpers is Test {
 
     // MOCKS: CONTRACTS
 
-    function setMockFeeManager(address _shares, uint256 _totalValueOwed) internal returns (address feeManager_) {
-        feeManager_ = address(new BlankFeeManager());
+    function setMockFeeHandler(address _shares, uint256 _totalValueOwed) internal returns (address feeHandler_) {
+        feeHandler_ = address(new BlankFeeHandler());
 
         vm.prank(Shares(_shares).owner());
-        Shares(_shares).setFeeManager(feeManager_);
+        Shares(_shares).setFeeHandler(feeHandler_);
 
-        feeManager_mockGetTotalValueOwed({_feeManager: feeManager_, _totalValueOwed: _totalValueOwed});
+        feeHandler_mockGetTotalValueOwed({_feeHandler: feeHandler_, _totalValueOwed: _totalValueOwed});
     }
 
     // MISC

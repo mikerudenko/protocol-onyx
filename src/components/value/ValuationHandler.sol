@@ -17,7 +17,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
 import {IChainlinkAggregator} from "src/interfaces/external/IChainlinkAggregator.sol";
-import {IFeeManager} from "src/interfaces/IFeeManager.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {VALUE_ASSET_PRECISION} from "src/utils/Constants.sol";
@@ -213,7 +213,7 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     /// @dev _untrackedPositionsValue and netShareValue_ are 18-decimal precision.
     /// If no shares exist:
     /// - logic still runs
-    /// - FeeManager is still called to settle fees
+    /// - FeeHandler is still called to settle fees
     /// - lastShareValue is set to 0
     /// Reverts if:
     /// - totalPositionsValue < 0
@@ -237,10 +237,10 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
 
         // Settle dynamic fees and get total fees owed
         uint256 totalFeesOwed;
-        address feeManager = shares.getFeeManager();
-        if (feeManager != address(0)) {
-            IFeeManager(feeManager).settleDynamicFees({_totalPositionsValue: totalPositionsValue});
-            totalFeesOwed = IFeeManager(feeManager).getTotalValueOwed();
+        address feeHandler = shares.getFeeHandler();
+        if (feeHandler != address(0)) {
+            IFeeHandler(feeHandler).settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+            totalFeesOwed = IFeeHandler(feeHandler).getTotalValueOwed();
         }
 
         // Calculate net share value (inclusive of total fees owed)

@@ -11,10 +11,10 @@
 
 pragma solidity ^0.8.0;
 
-import {FeeManager} from "src/components/fees/FeeManager.sol";
+import {FeeHandler} from "src/components/fees/FeeHandler.sol";
 import {ComponentHarnessMixin} from "test/harnesses/utils/ComponentHarnessMixin.sol";
 
-contract FeeManagerHarness is FeeManager, ComponentHarnessMixin {
+contract FeeHandlerHarness is FeeHandler, ComponentHarnessMixin {
     constructor(address _shares) ComponentHarnessMixin(_shares) {}
 
     function exposed_updateValueOwed(address _user, int256 _delta) external {

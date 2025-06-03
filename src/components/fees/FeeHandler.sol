@@ -15,25 +15,25 @@ import {IERC20Metadata as IERC20} from "@openzeppelin/contracts/token/ERC20/exte
 import {IManagementFeeTracker} from "src/components/fees/interfaces/IManagementFeeTracker.sol";
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
 import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
-import {IFeeManager} from "src/interfaces/IFeeManager.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {ONE_HUNDRED_PERCENT_BPS} from "src/utils/Constants.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
 
-/// @title FeeManager Contract
+/// @title FeeHandler Contract
 /// @author Enzyme Foundation <security@enzyme.finance>
 /// @notice Manages fees for a Shares contract
-contract FeeManager is IFeeManager, ComponentHelpersMixin {
+contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     //==================================================================================================================
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable FEE_MANAGER_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("FeeManager");
+    bytes32 private immutable FEE_MANAGER_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("FeeHandler");
 
-    /// @custom:storage-location erc7201:enzyme.FeeManager
-    struct FeeManagerStorage {
+    /// @custom:storage-location erc7201:enzyme.FeeHandler
+    struct FeeHandlerStorage {
         address managementFeeTracker;
         address performanceFeeTracker;
         address managementFeeRecipient; // cannot be address(0)
@@ -47,7 +47,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
         mapping(address => uint256) userFeesOwed;
     }
 
-    function __getFeeManagerStorage() private view returns (FeeManagerStorage storage $) {
+    function __getFeeHandlerStorage() private view returns (FeeHandlerStorage storage $) {
         bytes32 location = FEE_MANAGER_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -86,28 +86,28 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     // Errors
     //==================================================================================================================
 
-    error FeeManager__ClaimFees__Unauthorized();
+    error FeeHandler__ClaimFees__Unauthorized();
 
-    error FeeManager__ClaimFees__ZeroFeeAsset();
+    error FeeHandler__ClaimFees__ZeroFeeAsset();
 
-    error FeeManager__SetEntranceFee__ExceedsMax();
+    error FeeHandler__SetEntranceFee__ExceedsMax();
 
-    error FeeManager__SetExitFee__ExceedsMax();
+    error FeeHandler__SetExitFee__ExceedsMax();
 
-    error FeeManager__SetManagementFee__RecipientZeroAddress();
+    error FeeHandler__SetManagementFee__RecipientZeroAddress();
 
-    error FeeManager__SetPerformanceFee__RecipientZeroAddress();
+    error FeeHandler__SetPerformanceFee__RecipientZeroAddress();
 
-    error FeeManager__SettleDynamicFees__Unauthorized();
+    error FeeHandler__SettleDynamicFees__Unauthorized();
 
     //==================================================================================================================
     // Config (access: Shares admin or owner)
     //==================================================================================================================
 
     function setEntranceFee(uint16 _feeBps, address _recipient) external onlyAdminOrOwner {
-        require(_feeBps < ONE_HUNDRED_PERCENT_BPS, FeeManager__SetEntranceFee__ExceedsMax());
+        require(_feeBps < ONE_HUNDRED_PERCENT_BPS, FeeHandler__SetEntranceFee__ExceedsMax());
 
-        FeeManagerStorage storage $ = __getFeeManagerStorage();
+        FeeHandlerStorage storage $ = __getFeeHandlerStorage();
         $.entranceFeeBps = _feeBps;
         $.entranceFeeRecipient = _recipient;
 
@@ -115,9 +115,9 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     }
 
     function setExitFee(uint16 _feeBps, address _recipient) external onlyAdminOrOwner {
-        require(_feeBps < ONE_HUNDRED_PERCENT_BPS, FeeManager__SetExitFee__ExceedsMax());
+        require(_feeBps < ONE_HUNDRED_PERCENT_BPS, FeeHandler__SetExitFee__ExceedsMax());
 
-        FeeManagerStorage storage $ = __getFeeManagerStorage();
+        FeeHandlerStorage storage $ = __getFeeHandlerStorage();
         $.exitFeeBps = _feeBps;
         $.exitFeeRecipient = _recipient;
 
@@ -125,7 +125,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     }
 
     function setFeeAsset(address _asset) external onlyAdminOrOwner {
-        FeeManagerStorage storage $ = __getFeeManagerStorage();
+        FeeHandlerStorage storage $ = __getFeeHandlerStorage();
         $.feeAsset = _asset;
 
         emit FeeAssetSet({asset: _asset});
@@ -134,9 +134,9 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     /// @dev _managementFeeTracker can be empty (to disable)
     /// _recipient cannot be empty (unused if disabled)
     function setManagementFee(address _managementFeeTracker, address _recipient) external onlyAdminOrOwner {
-        require(_recipient != address(0), FeeManager__SetManagementFee__RecipientZeroAddress());
+        require(_recipient != address(0), FeeHandler__SetManagementFee__RecipientZeroAddress());
 
-        FeeManagerStorage storage $ = __getFeeManagerStorage();
+        FeeHandlerStorage storage $ = __getFeeHandlerStorage();
         $.managementFeeTracker = _managementFeeTracker;
         $.managementFeeRecipient = _recipient;
 
@@ -146,9 +146,9 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     /// @dev _performanceFeeTracker can be empty (to disable)
     /// _recipient cannot be empty (unused if disabled)
     function setPerformanceFee(address _performanceFeeTracker, address _recipient) external onlyAdminOrOwner {
-        require(_recipient != address(0), FeeManager__SetPerformanceFee__RecipientZeroAddress());
+        require(_recipient != address(0), FeeHandler__SetPerformanceFee__RecipientZeroAddress());
 
-        FeeManagerStorage storage $ = __getFeeManagerStorage();
+        FeeHandlerStorage storage $ = __getFeeHandlerStorage();
         $.performanceFeeTracker = _performanceFeeTracker;
         $.performanceFeeRecipient = _recipient;
 
@@ -161,7 +161,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
 
     /// @dev Only callable by owed user or admin
     function claimFees(address _onBehalf, uint256 _value) external returns (uint256 feeAssetAmount_) {
-        require(msg.sender == _onBehalf || __isAdminOrOwner(msg.sender), FeeManager__ClaimFees__Unauthorized());
+        require(msg.sender == _onBehalf || __isAdminOrOwner(msg.sender), FeeHandler__ClaimFees__Unauthorized());
         // `_value > owed` reverts in __updateValueOwed()
 
         Shares shares = Shares(__getShares());
@@ -169,7 +169,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
         address feeAsset = getFeeAsset();
 
         feeAssetAmount_ = valuationHandler.convertValueToAssetAmount({_value: _value, _asset: feeAsset});
-        require(feeAssetAmount_ > 0, FeeManager__ClaimFees__ZeroFeeAsset());
+        require(feeAssetAmount_ > 0, FeeHandler__ClaimFees__ZeroFeeAsset());
 
         __updateValueOwed({_user: _onBehalf, _delta: -int256(_value)});
 
@@ -191,7 +191,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     /// @dev Callable by: ValuationHandler
     function settleDynamicFees(uint256 _totalPositionsValue) external override {
         require(
-            msg.sender == Shares(__getShares()).getValuationHandler(), FeeManager__SettleDynamicFees__Unauthorized()
+            msg.sender == Shares(__getShares()).getValuationHandler(), FeeHandler__SettleDynamicFees__Unauthorized()
         );
 
         // Deduct unclaimed fees
@@ -285,7 +285,7 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
         uint256 userValueOwed = uint256(int256(getValueOwedToUser(_user)) + _delta);
         uint256 totalValueOwed = uint256(int256(getTotalValueOwed()) + _delta);
 
-        FeeManagerStorage storage $ = __getFeeManagerStorage();
+        FeeHandlerStorage storage $ = __getFeeHandlerStorage();
         $.userFeesOwed[_user] = userValueOwed;
         $.totalFeesOwed = totalValueOwed;
 
@@ -298,46 +298,46 @@ contract FeeManager is IFeeManager, ComponentHelpersMixin {
     //==================================================================================================================
 
     function getEntranceFeeBps() public view returns (uint16 entranceFeeBps_) {
-        return __getFeeManagerStorage().entranceFeeBps;
+        return __getFeeHandlerStorage().entranceFeeBps;
     }
 
     function getEntranceFeeRecipient() public view returns (address entranceFeeRecipient_) {
-        return __getFeeManagerStorage().entranceFeeRecipient;
+        return __getFeeHandlerStorage().entranceFeeRecipient;
     }
 
     function getExitFeeBps() public view returns (uint16 exitFeeBps_) {
-        return __getFeeManagerStorage().exitFeeBps;
+        return __getFeeHandlerStorage().exitFeeBps;
     }
 
     function getExitFeeRecipient() public view returns (address exitFeeRecipient_) {
-        return __getFeeManagerStorage().exitFeeRecipient;
+        return __getFeeHandlerStorage().exitFeeRecipient;
     }
 
     function getFeeAsset() public view returns (address feeAsset_) {
-        return __getFeeManagerStorage().feeAsset;
+        return __getFeeHandlerStorage().feeAsset;
     }
 
     function getManagementFeeRecipient() public view returns (address managementFeeRecipient_) {
-        return __getFeeManagerStorage().managementFeeRecipient;
+        return __getFeeHandlerStorage().managementFeeRecipient;
     }
 
     function getManagementFeeTracker() public view returns (address managementFeeTracker_) {
-        return __getFeeManagerStorage().managementFeeTracker;
+        return __getFeeHandlerStorage().managementFeeTracker;
     }
 
     function getPerformanceFeeRecipient() public view returns (address performanceFeeRecipient_) {
-        return __getFeeManagerStorage().performanceFeeRecipient;
+        return __getFeeHandlerStorage().performanceFeeRecipient;
     }
 
     function getPerformanceFeeTracker() public view returns (address performanceFeeTracker_) {
-        return __getFeeManagerStorage().performanceFeeTracker;
+        return __getFeeHandlerStorage().performanceFeeTracker;
     }
 
     function getTotalValueOwed() public view override returns (uint256 totalValueOwed_) {
-        return __getFeeManagerStorage().totalFeesOwed;
+        return __getFeeHandlerStorage().totalFeesOwed;
     }
 
     function getValueOwedToUser(address _user) public view returns (uint256 valueOwed_) {
-        return __getFeeManagerStorage().userFeesOwed[_user];
+        return __getFeeHandlerStorage().userFeesOwed[_user];
     }
 }

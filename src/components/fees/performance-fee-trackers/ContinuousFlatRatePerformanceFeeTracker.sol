@@ -93,7 +93,7 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
     // Settlement
     //==================================================================================================================
 
-    function settlePerformanceFee(uint256 _netValue) external onlyFeeManager returns (uint256 valueDue_) {
+    function settlePerformanceFee(uint256 _netValue) external onlyFeeHandler returns (uint256 valueDue_) {
         // Always require an initial hwm to be set
         uint256 hwm = getHighWaterMark();
         require(hwm > 0, ContinuousFlatRatePerformanceFeeTracker__SettlePerformanceFee__HighWaterMarkNotInitialized());
