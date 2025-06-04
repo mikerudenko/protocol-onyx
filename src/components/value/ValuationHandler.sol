@@ -49,7 +49,7 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     // Storage
     //==================================================================================================================
 
-    bytes32 public immutable SHARE_VALUE_HANDLER_STORAGE_LOCATION =
+    bytes32 public immutable VALUATION_HANDLER_STORAGE_LOCATION =
         StorageHelpersLib.deriveErc7201Location("ValuationHandler");
 
     /// @custom:storage-location erc7201:enzyme.ValuationHandler
@@ -61,7 +61,7 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     }
 
     function __getValuationHandlerStorage() internal view returns (ValuationHandlerStorage storage $) {
-        bytes32 location = SHARE_VALUE_HANDLER_STORAGE_LOCATION;
+        bytes32 location = VALUATION_HANDLER_STORAGE_LOCATION;
         assembly {
             $.slot := location
         }

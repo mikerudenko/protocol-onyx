@@ -82,9 +82,9 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event DepositAssetsDestSet(address dest);
 
-    event DepositHandlerAdded(address handler);
+    event DepositHandlerAdded(address depositHandler);
 
-    event DepositHandlerRemoved(address handler);
+    event DepositHandlerRemoved(address depositHandler);
 
     event RedeemAssetsSrcSet(address src);
 
@@ -94,9 +94,9 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event HolderRestrictionSet(HolderRestriction holderRestriction);
 
-    event RedeemHandlerAdded(address queue);
+    event RedeemHandlerAdded(address redeemHandler);
 
-    event RedeemHandlerRemoved(address queue);
+    event RedeemHandlerRemoved(address redeemHandler);
 
     event ValuationHandlerSet(address valuationHandler);
 

@@ -30,7 +30,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable FEE_MANAGER_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("FeeHandler");
+    bytes32 private immutable FEE_HANDLER_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("FeeHandler");
 
     /// @custom:storage-location erc7201:enzyme.FeeHandler
     struct FeeHandlerStorage {
@@ -48,7 +48,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     }
 
     function __getFeeHandlerStorage() private view returns (FeeHandlerStorage storage $) {
-        bytes32 location = FEE_MANAGER_STORAGE_LOCATION;
+        bytes32 location = FEE_HANDLER_STORAGE_LOCATION;
         assembly {
             $.slot := location
         }
