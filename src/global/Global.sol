@@ -25,6 +25,4 @@ contract Global is Ownable2StepUpgradeable {
     function init(address _owner) external initializer {
         __Ownable_init({initialOwner: _owner});
     }
-
-    // TODO: add a timelock for ownership change?
 }
