@@ -60,7 +60,7 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
     event Settled(uint256 valueDue);
 
     //==================================================================================================================
-    // Events
+    // Errors
     //==================================================================================================================
 
     error ContinuousFlatRatePerformanceFeeTracker__SetRate__ExceedsMax();

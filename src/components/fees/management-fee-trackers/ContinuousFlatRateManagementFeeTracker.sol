@@ -53,7 +53,7 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
     event Settled(uint256 valueDue);
 
     //==================================================================================================================
-    // Events
+    // Errors
     //==================================================================================================================
 
     error ContinuousFlatRateManagementFeeTracker__SetRate__ExceedsMax();
