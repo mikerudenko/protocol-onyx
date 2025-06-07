@@ -12,12 +12,13 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title Global Contract
 /// @author Enzyme Foundation <security@enzyme.finance>
 /// @notice A contract for global values
-/// @dev Proxy implementation
-contract Global is Ownable2StepUpgradeable {
+/// @dev OpenZeppelin ERC1967Proxy-compatible implementation
+contract Global is UUPSUpgradeable, Ownable2StepUpgradeable {
     //==================================================================================================================
     // Initialize
     //==================================================================================================================
@@ -25,4 +26,10 @@ contract Global is Ownable2StepUpgradeable {
     function init(address _owner) external initializer {
         __Ownable_init({initialOwner: _owner});
     }
+
+    //==================================================================================================================
+    // UUPSUpgradeable
+    //==================================================================================================================
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 }
