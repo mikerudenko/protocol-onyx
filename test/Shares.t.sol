@@ -871,49 +871,20 @@ contract SharesTest is Test, TestHelpers {
         vm.expectRevert(Shares.Shares__OnlyDepositHandler__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shares.mintFor({_to: address(0), _grossSharesAmount: 0, _skipFee: false});
+        shares.mintFor({_to: address(0), _sharesAmount: 0});
     }
 
-    function test_mintFor_success_noFeeHandler() public {
-        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: false, _skipFee: false});
-    }
-
-    function test_mintFor_success_skipFee() public {
-        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: true, _skipFee: true});
-    }
-
-    function test_mintFor_success_withFee() public {
-        __test_mintFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: true, _skipFee: false});
-    }
-
-    function __test_mintFor_success(
-        uint256 _grossSharesAmount,
-        uint256 _feeSharesAmount,
-        bool _hasFeeHandler,
-        bool _skipFee
-    ) internal {
-        uint256 expectedNetSharesAmount =
-            _skipFee || !_hasFeeHandler ? _grossSharesAmount : _grossSharesAmount - _feeSharesAmount;
-
+    function test_mintFor_success() public {
+        uint256 sharesAmount = 100;
         address to = makeAddr("mintFor:to");
         address depositHandler = makeAddr("mintFor:depositHandler");
         vm.prank(owner);
         shares.addDepositHandler(depositHandler);
 
-        if (_hasFeeHandler) {
-            IFeeHandler feeHandler = new BlankFeeHandler();
-            vm.prank(owner);
-            shares.setFeeHandler(address(feeHandler));
-
-            feeHandler_mockSettleEntranceFee({_feeHandler: address(feeHandler), _feeSharesAmount: _feeSharesAmount});
-        }
-
         vm.prank(depositHandler);
-        uint256 netSharesAmount = shares.mintFor({_to: to, _grossSharesAmount: _grossSharesAmount, _skipFee: _skipFee});
+        shares.mintFor({_to: to, _sharesAmount: sharesAmount});
 
-        // Minted amount and net amount should both be gross shares
-        assertEq(netSharesAmount, expectedNetSharesAmount);
-        assertEq(shares.balanceOf(to), expectedNetSharesAmount);
+        assertEq(shares.balanceOf(to), sharesAmount);
     }
 
     function test_burnFor_fail_unauthorized() public {
@@ -922,54 +893,25 @@ contract SharesTest is Test, TestHelpers {
         vm.expectRevert(Shares.Shares__OnlyRedeemHandler__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shares.burnFor({_from: address(0), _grossSharesAmount: 0, _skipFee: false});
+        shares.burnFor({_from: address(0), _sharesAmount: 0});
     }
 
-    function test_burnFor_success_noFeeHandler() public {
-        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: false, _skipFee: false});
-    }
-
-    function test_burnFor_success_skipFee() public {
-        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: true, _skipFee: true});
-    }
-
-    function test_burnFor_success_withFee() public {
-        __test_burnFor_success({_grossSharesAmount: 100, _feeSharesAmount: 2, _hasFeeHandler: true, _skipFee: false});
-    }
-
-    function __test_burnFor_success(
-        uint256 _grossSharesAmount,
-        uint256 _feeSharesAmount,
-        bool _hasFeeHandler,
-        bool _skipFee
-    ) internal {
-        uint256 expectedNetSharesAmount =
-            _skipFee || !_hasFeeHandler ? _grossSharesAmount : _grossSharesAmount - _feeSharesAmount;
-
+    function test_burnFor_success() public {
         // Mint some shares to `from`
         address from = makeAddr("burnFor:from");
         uint256 initialFromBalance = 100;
         deal({token: address(shares), to: from, give: initialFromBalance, adjust: true});
 
+        uint256 sharesToBurn = initialFromBalance / 5;
+
         address redeemHandler = makeAddr("burnFor:redeemHandler");
         vm.prank(owner);
         shares.addRedeemHandler(redeemHandler);
 
-        if (_hasFeeHandler) {
-            IFeeHandler feeHandler = new BlankFeeHandler();
-            vm.prank(owner);
-            shares.setFeeHandler(address(feeHandler));
-
-            feeHandler_mockSettleExitFee({_feeHandler: address(feeHandler), _feeSharesAmount: _feeSharesAmount});
-        }
-
         vm.prank(redeemHandler);
-        uint256 netSharesAmount =
-            shares.burnFor({_from: from, _grossSharesAmount: _grossSharesAmount, _skipFee: _skipFee});
+        shares.burnFor({_from: from, _sharesAmount: sharesToBurn});
 
-        // Burned balance should be gross shares, return value should be net shares
-        assertEq(netSharesAmount, expectedNetSharesAmount);
-        assertEq(shares.balanceOf(from), initialFromBalance - _grossSharesAmount);
+        assertEq(shares.balanceOf(from), initialFromBalance - sharesToBurn);
     }
 
     function test_withdrawRedeemAssetTo_fail_unauthorized() public {

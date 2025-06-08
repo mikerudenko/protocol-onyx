@@ -17,6 +17,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC7540LikeDepositHandler} from "src/components/issuance/deposit-handlers/IERC7540LikeDepositHandler.sol";
 import {ERC7540LikeIssuanceBase} from "src/components/issuance/utils/ERC7540LikeIssuanceBase.sol";
 import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
@@ -181,6 +182,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
 
     function executeDepositRequests(uint256[] memory _requestIds) external onlyAdminOrOwner {
         Shares shares = Shares(__getShares());
+        IFeeHandler feeHandler = IFeeHandler(shares.getFeeHandler());
         ValuationHandler valuationHandler = ValuationHandler(shares.getValuationHandler());
 
         // Calculate the share price in the deposit asset
@@ -198,14 +200,22 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
             // Add to total assets deposited
             totalAssetsDeposited += request.assetAmount;
 
-            // Calculate and mint shares to the user
+            // Calculate gross shares
             uint256 grossSharesAmount = ValueHelpersLib.calcSharesAmountForValue({
                 _valuePerShare: sharePriceInDepositAsset,
                 _value: request.assetAmount
             });
-            uint256 netShares =
-                shares.mintFor({_to: request.controller, _grossSharesAmount: grossSharesAmount, _skipFee: false});
+            // Settle any entrance fee
+            uint256 feeSharesAmount = address(feeHandler) == address(0)
+                ? 0
+                : feeHandler.settleEntranceFee({_grossSharesAmount: grossSharesAmount});
+
+            // Calculate net shares
+            uint256 netShares = grossSharesAmount - feeSharesAmount;
             require(netShares > 0, ERC7540LikeDepositQueue__ExecuteDepositRequests__ZeroShares());
+
+            // Mint net shares to user
+            shares.mintFor({_to: request.controller, _sharesAmount: netShares});
 
             // Required event for ERC7540
             emit Deposit({

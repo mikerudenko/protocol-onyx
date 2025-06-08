@@ -17,6 +17,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IERC7540LikeRedeemHandler} from "src/components/issuance/redeem-handlers/IERC7540LikeRedeemHandler.sol";
 import {ERC7540LikeIssuanceBase} from "src/components/issuance/utils/ERC7540LikeIssuanceBase.sol";
 import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
+import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
@@ -85,8 +86,6 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
     error ERC7540LikeRedeemQueue__ExecuteRedeemRequests__ZeroAssets();
 
     error ERC7540LikeRedeemQueue__PendingRedeemRequest__RequestControllerMismatch();
-
-    error ERC7540LikeRedeemQueue__RequestRedeem__ControllerNotAllowedRedeemer();
 
     error ERC7540LikeRedeemQueue__RequestRedeem__OwnerNotController();
 
@@ -180,6 +179,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
 
     function executeRedeemRequests(uint256[] memory _requestIds) external onlyAdminOrOwner {
         Shares shares = Shares(__getShares());
+        IFeeHandler feeHandler = IFeeHandler(shares.getFeeHandler());
         ValuationHandler valuationHandler = ValuationHandler(shares.getValuationHandler());
 
         // Calculate the share price in the redeem asset
@@ -193,9 +193,16 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
             // Remove request
             __removeRedeemRequest({_requestId: requestId});
 
-            // Burn shares and get net shares amount after fees
-            uint256 netShares =
-                shares.burnFor({_from: address(this), _grossSharesAmount: request.sharesAmount, _skipFee: false});
+            // Settle any exit fee
+            uint256 feeSharesAmount = address(feeHandler) == address(0)
+                ? 0
+                : feeHandler.settleExitFee({_grossSharesAmount: request.sharesAmount});
+
+            // Calculate net shares
+            uint256 netShares = request.sharesAmount - feeSharesAmount;
+
+            // Burn net shares held by this contract
+            shares.burnFor({_from: address(this), _sharesAmount: netShares});
 
             // Calculate the asset amount due
             uint256 userAssets = ValueHelpersLib.calcValueOfSharesAmount({

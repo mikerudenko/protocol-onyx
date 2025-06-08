@@ -100,6 +100,10 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
 
     error FeeHandler__SettleDynamicFees__Unauthorized();
 
+    error FeeHandler__SettleEntranceFee__Unauthorized();
+
+    error FeeHandler__SettleExitFee__Unauthorized();
+
     //==================================================================================================================
     // Config (access: Shares admin or owner)
     //==================================================================================================================
@@ -156,10 +160,10 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     }
 
     //==================================================================================================================
-    // Claim Fees (access: anybody)
+    // Claim Fees
     //==================================================================================================================
 
-    /// @dev Only callable by owed user or admin
+    /// @dev Callable by: (1) owed user, or (2) admin
     function claimFees(address _onBehalf, uint256 _value) external returns (uint256 feeAssetAmount_) {
         require(msg.sender == _onBehalf || __isAdminOrOwner(msg.sender), FeeHandler__ClaimFees__Unauthorized());
         // `_value > owed` reverts in __updateValueOwed()
@@ -185,7 +189,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     }
 
     //==================================================================================================================
-    // Settle Fees (access: mixed)
+    // Settle Fees
     //==================================================================================================================
 
     /// @dev Callable by: ValuationHandler
@@ -221,21 +225,17 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
         }
     }
 
-    function settleEntranceFee(uint256 _grossSharesAmount)
-        external
-        override
-        onlyShares
-        returns (uint256 feeSharesAmount_)
-    {
+    /// @dev Callable by: DepositHandler
+    function settleEntranceFee(uint256 _grossSharesAmount) external override returns (uint256 feeSharesAmount_) {
+        require(Shares(__getShares()).isDepositHandler(msg.sender), FeeHandler__SettleEntranceFee__Unauthorized());
+
         return __settleEntranceExitFee({_grossSharesAmount: _grossSharesAmount, _isEntrance: true});
     }
 
-    function settleExitFee(uint256 _grossSharesAmount)
-        external
-        override
-        onlyShares
-        returns (uint256 feeSharesAmount_)
-    {
+    /// @dev Callable by: RedeemHandler
+    function settleExitFee(uint256 _grossSharesAmount) external override returns (uint256 feeSharesAmount_) {
+        require(Shares(__getShares()).isRedeemHandler(msg.sender), FeeHandler__SettleExitFee__Unauthorized());
+
         return __settleEntranceExitFee({_grossSharesAmount: _grossSharesAmount, _isEntrance: false});
     }
 

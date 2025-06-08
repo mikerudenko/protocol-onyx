@@ -264,11 +264,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         emit FeeAssetsSrcSet(_feeAssetsSrc);
     }
 
-    function setRedeemAssetsSrc(address _redeemAssetsDest) external onlyAdminOrOwner {
+    function setRedeemAssetsSrc(address _redeemAssetsSrc) external onlyAdminOrOwner {
         SharesStorage storage $ = __getSharesStorage();
-        $.redeemAssetsSrc = _redeemAssetsDest;
+        $.redeemAssetsSrc = _redeemAssetsSrc;
 
-        emit RedeemAssetsSrcSet(_redeemAssetsDest);
+        emit RedeemAssetsSrcSet(_redeemAssetsSrc);
     }
 
     // SYSTEM CONTRACTS
@@ -385,39 +385,15 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // DEPOSIT FLOW
 
     /// @dev Callable by: DepositHandler
-    function mintFor(address _to, uint256 _grossSharesAmount, bool _skipFee)
-        external
-        onlyDepositHandler
-        returns (uint256 netSharesAmount_)
-    {
-        if (_skipFee || getFeeHandler() == address(0)) {
-            netSharesAmount_ = _grossSharesAmount;
-        } else {
-            uint256 feeSharesAmount =
-                IFeeHandler(getFeeHandler()).settleEntranceFee({_grossSharesAmount: _grossSharesAmount});
-            netSharesAmount_ = _grossSharesAmount - feeSharesAmount;
-        }
-
-        _mint(_to, netSharesAmount_);
+    function mintFor(address _to, uint256 _sharesAmount) external onlyDepositHandler {
+        _mint(_to, _sharesAmount);
     }
 
     // REDEEM FLOW
 
     /// @dev Callable by: RedeemHandler
-    function burnFor(address _from, uint256 _grossSharesAmount, bool _skipFee)
-        external
-        onlyRedeemHandler
-        returns (uint256 netSharesAmount_)
-    {
-        if (_skipFee || getFeeHandler() == address(0)) {
-            netSharesAmount_ = _grossSharesAmount;
-        } else {
-            uint256 feeSharesAmount =
-                IFeeHandler(getFeeHandler()).settleExitFee({_grossSharesAmount: _grossSharesAmount});
-            netSharesAmount_ = _grossSharesAmount - feeSharesAmount;
-        }
-
-        _burn(_from, _grossSharesAmount);
+    function burnFor(address _from, uint256 _sharesAmount) external onlyRedeemHandler {
+        _burn(_from, _sharesAmount);
     }
 
     /// @dev Callable by: RedeemHandler

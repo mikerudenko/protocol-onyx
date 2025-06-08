@@ -491,7 +491,7 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
     function test_settleEntranceFee_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyShares__Unauthorized.selector);
+        vm.expectRevert(FeeHandler.FeeHandler__SettleEntranceFee__Unauthorized.selector);
 
         vm.prank(randomUser);
         feeHandler.settleEntranceFee(0);
@@ -508,7 +508,7 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
     function test_settleExitFee_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyShares__Unauthorized.selector);
+        vm.expectRevert(FeeHandler.FeeHandler__SettleExitFee__Unauthorized.selector);
 
         vm.prank(randomUser);
         feeHandler.settleExitFee(0);
@@ -527,8 +527,18 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         uint16 feeBps = 500; // 5%
         uint256 expectedFeeSharesAmount = 500_000;
         uint256 sharePrice = 3e18; // 3 value units per share
-        uint256 expectedFeevalue = 1_500_000;
+        uint256 expectedFeeValue = 1_500_000;
         address feeRecipient = _burn ? address(0) : makeAddr("test_settleEntranceExitFee:feeRecipient");
+
+        // Add deposit or redeem handler to be the caller
+        address settleCaller = makeAddr("settleCaller");
+        if (_entrance) {
+            vm.prank(admin);
+            shares.addDepositHandler({_handler: settleCaller});
+        } else {
+            vm.prank(admin);
+            shares.addRedeemHandler({_handler: settleCaller});
+        }
 
         // Mock the share price on Shares
         shares_mockSharePrice({_shares: address(shares), _sharePrice: sharePrice, _timestamp: block.timestamp});
@@ -544,13 +554,13 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         // Event returns the value amount (not shares)
         vm.expectEmit(address(feeHandler));
         if (_entrance) {
-            emit FeeHandler.EntranceFeeSettled({recipient: feeRecipient, value: expectedFeevalue});
+            emit FeeHandler.EntranceFeeSettled({recipient: feeRecipient, value: expectedFeeValue});
         } else {
-            emit FeeHandler.ExitFeeSettled({recipient: feeRecipient, value: expectedFeevalue});
+            emit FeeHandler.ExitFeeSettled({recipient: feeRecipient, value: expectedFeeValue});
         }
 
-        // 1st settlement
-        vm.prank(address(shares));
+        // Settle fee
+        vm.prank(settleCaller);
         uint256 feeSharesAmount;
         if (_entrance) {
             feeSharesAmount = feeHandler.settleEntranceFee({_grossSharesAmount: grossSharesAmount});
@@ -563,8 +573,8 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         if (_burn) {
             assertEq(feeHandler.getTotalValueOwed(), 0);
         } else {
-            assertEq(feeHandler.getTotalValueOwed(), expectedFeevalue);
-            assertEq(feeHandler.getValueOwedToUser(feeRecipient), expectedFeevalue);
+            assertEq(feeHandler.getTotalValueOwed(), expectedFeeValue);
+            assertEq(feeHandler.getValueOwedToUser(feeRecipient), expectedFeeValue);
         }
     }
 
