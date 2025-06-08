@@ -18,7 +18,6 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
-import {ValueHelpersLib} from "src/utils/ValueHelpersLib.sol";
 
 /// @title Shares Contract
 /// @author Enzyme Foundation <security@enzyme.finance>
@@ -114,8 +113,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     error Shares__AddRedeemHandler__AlreadyAdded();
 
-    error Shares__AddPositionTracker__AlreadyAdded();
-
     error Shares__AuthTransfer__Unauthorized();
 
     error Shares__GetDepositAssetsDest__NotSet();
@@ -138,15 +135,9 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     error Shares__RemoveDepositHandler__AlreadyRemoved();
 
-    error Shares__RemovePositionTracker__AlreadyRemoved();
-
     error Shares__RemoveRedeemHandler__AlreadyRemoved();
 
     error Shares__SetValueAsset__Empty();
-
-    error Shares__SettleDynamicFees__Unauthorized();
-
-    error Shares__ValidateDepositRecipient__NotAllowed();
 
     error Shares__ValidateTransferRecipient__NotAllowed();
 
@@ -478,7 +469,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     /// @dev Non-standard to have getter revert, but prevents sending to address(0)
     function getDepositAssetsDest() public view returns (address) {
         address depositAssetsDest = __getSharesStorage().depositAssetsDest;
-        require(depositAssetsDest != address(0), "Shares__GetDepositAssetsDest__NotSet");
+        require(depositAssetsDest != address(0), Shares__GetDepositAssetsDest__NotSet());
 
         return __getSharesStorage().depositAssetsDest;
     }
