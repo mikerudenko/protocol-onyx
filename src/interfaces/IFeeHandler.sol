@@ -16,9 +16,9 @@ pragma solidity ^0.8.0;
 interface IFeeHandler {
     function getTotalValueOwed() external view returns (uint256 totalValueOwed_);
 
-    function settleDynamicFees(uint256 _totalPositionsValue) external;
+    function settleDynamicFeesGivenPositionsValue(uint256 _totalPositionsValue) external;
 
-    function settleEntranceFee(uint256 _grossSharesAmount) external returns (uint256 feeShares_);
+    function settleEntranceFeeGivenGrossShares(uint256 _grossSharesAmount) external returns (uint256 feeShares_);
 
-    function settleExitFee(uint256 _grossSharesAmount) external returns (uint256 feeShares_);
+    function settleExitFeeGivenGrossShares(uint256 _grossSharesAmount) external returns (uint256 feeShares_);
 }

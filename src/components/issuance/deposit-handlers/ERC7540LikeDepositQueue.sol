@@ -208,7 +208,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
             // Settle any entrance fee
             uint256 feeSharesAmount = address(feeHandler) == address(0)
                 ? 0
-                : feeHandler.settleEntranceFee({_grossSharesAmount: grossSharesAmount});
+                : feeHandler.settleEntranceFeeGivenGrossShares({_grossSharesAmount: grossSharesAmount});
 
             // Calculate net shares
             uint256 netShares = grossSharesAmount - feeSharesAmount;

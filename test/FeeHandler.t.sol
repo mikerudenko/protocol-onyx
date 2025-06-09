@@ -276,7 +276,7 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         address managementFeeTracker = setMockManagementFee({_feeHandler: address(feeHandler), _admin: admin});
         managementFeeTracker_mockSettleManagementFee({_managementFeeTracker: managementFeeTracker, _valueDue: valueDue});
         vm.prank(address(valuationHandler));
-        feeHandler.settleDynamicFees({_totalPositionsValue: valueDue * 3});
+        feeHandler.settleDynamicFeesGivenPositionsValue({_totalPositionsValue: valueDue * 3});
         address feeRecipient = feeHandler.getManagementFeeRecipient();
         assertEq(feeHandler.getValueOwedToUser(feeRecipient), valueDue);
 
@@ -342,23 +342,23 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
     // Settle Fees (access: Shares)
     //==================================================================================================================
 
-    function test_settleDynamicFees_fail_unauthorized() public {
+    function test_settleDynamicFeesGivenPositionsValue_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(FeeHandler.FeeHandler__SettleDynamicFees__Unauthorized.selector);
+        vm.expectRevert(FeeHandler.FeeHandler__SettleDynamicFeesGivenPositionsValue__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeHandler.settleDynamicFees(0);
+        feeHandler.settleDynamicFeesGivenPositionsValue(0);
     }
 
-    function test_settleDynamicFees_success_noFees() public {
+    function test_settleDynamicFeesGivenPositionsValue_success_noFees() public {
         vm.prank(address(valuationHandler));
-        feeHandler.settleDynamicFees({_totalPositionsValue: 123});
+        feeHandler.settleDynamicFeesGivenPositionsValue({_totalPositionsValue: 123});
 
         assertEq(feeHandler.getTotalValueOwed(), 0);
     }
 
-    function test_settleDynamicFees_success_managementFeeOnly() public {
+    function test_settleDynamicFeesGivenPositionsValue_success_managementFeeOnly() public {
         uint256 feeValueDue = 456;
         uint256 totalPositionsValue = feeValueDue * 7;
 
@@ -378,13 +378,13 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         emit FeeHandler.ManagementFeeSettled({recipient: feeHandler.getManagementFeeRecipient(), value: feeValueDue});
 
         vm.prank(address(valuationHandler));
-        feeHandler.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+        feeHandler.settleDynamicFeesGivenPositionsValue({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeHandler.getTotalValueOwed(), feeValueDue);
         assertEq(feeHandler.getValueOwedToUser(feeHandler.getManagementFeeRecipient()), feeValueDue);
     }
 
-    function test_settleDynamicFees_success_performanceFeeOnly() public {
+    function test_settleDynamicFeesGivenPositionsValue_success_performanceFeeOnly() public {
         uint256 feeValueDue = 456;
         uint256 totalPositionsValue = feeValueDue * 7;
 
@@ -404,13 +404,13 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         emit FeeHandler.PerformanceFeeSettled({recipient: feeHandler.getPerformanceFeeRecipient(), value: feeValueDue});
 
         vm.prank(address(valuationHandler));
-        feeHandler.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+        feeHandler.settleDynamicFeesGivenPositionsValue({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeHandler.getTotalValueOwed(), feeValueDue);
         assertEq(feeHandler.getValueOwedToUser(feeHandler.getPerformanceFeeRecipient()), feeValueDue);
     }
 
-    function test_settleDynamicFees_success_bothFees() public {
+    function test_settleDynamicFeesGivenPositionsValue_success_bothFees() public {
         uint256 managementFeeValueDue = 456;
         uint256 performanceFeeValueDue = 789;
         uint256 totalPositionsValue = (managementFeeValueDue + performanceFeeValueDue) * 7;
@@ -454,7 +454,7 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         });
 
         vm.prank(address(valuationHandler));
-        feeHandler.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+        feeHandler.settleDynamicFeesGivenPositionsValue({_totalPositionsValue: totalPositionsValue});
 
         uint256 totalValueOwedAfter1stSettlement = managementFeeValueDue + performanceFeeValueDue;
 
@@ -481,44 +481,44 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         }
 
         vm.prank(address(valuationHandler));
-        feeHandler.settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+        feeHandler.settleDynamicFeesGivenPositionsValue({_totalPositionsValue: totalPositionsValue});
 
         assertEq(feeHandler.getTotalValueOwed(), 2 * totalValueOwedAfter1stSettlement);
         assertEq(feeHandler.getValueOwedToUser(feeHandler.getManagementFeeRecipient()), 2 * managementFeeValueDue);
         assertEq(feeHandler.getValueOwedToUser(feeHandler.getPerformanceFeeRecipient()), 2 * performanceFeeValueDue);
     }
 
-    function test_settleEntranceFee_fail_unauthorized() public {
+    function test_settleEntranceFeeGivenGrossShares_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(FeeHandler.FeeHandler__SettleEntranceFee__Unauthorized.selector);
+        vm.expectRevert(FeeHandler.FeeHandler__SettleEntranceFeeGivenGrossShares__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeHandler.settleEntranceFee(0);
+        feeHandler.settleEntranceFeeGivenGrossShares(0);
     }
 
-    function test_settleEntranceFee_success_burn() public {
+    function test_settleEntranceFeeGivenGrossShares_success_burn() public {
         __test_settleEntranceExitFee_success({_entrance: true, _burn: true});
     }
 
-    function test_settleEntranceFee_success_recipient() public {
+    function test_settleEntranceFeeGivenGrossShares_success_recipient() public {
         __test_settleEntranceExitFee_success({_entrance: true, _burn: false});
     }
 
-    function test_settleExitFee_fail_unauthorized() public {
+    function test_settleExitFeeGivenGrossShares_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(FeeHandler.FeeHandler__SettleExitFee__Unauthorized.selector);
+        vm.expectRevert(FeeHandler.FeeHandler__SettleExitFeeGivenGrossShares__Unauthorized.selector);
 
         vm.prank(randomUser);
-        feeHandler.settleExitFee(0);
+        feeHandler.settleExitFeeGivenGrossShares(0);
     }
 
-    function test_settleExitFee_success_burn() public {
+    function test_settleExitFeeGivenGrossShares_success_burn() public {
         __test_settleEntranceExitFee_success({_entrance: false, _burn: true});
     }
 
-    function test_settleExitFee_success_recipient() public {
+    function test_settleExitFeeGivenGrossShares_success_recipient() public {
         __test_settleEntranceExitFee_success({_entrance: false, _burn: false});
     }
 
@@ -563,9 +563,9 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         vm.prank(settleCaller);
         uint256 feeSharesAmount;
         if (_entrance) {
-            feeSharesAmount = feeHandler.settleEntranceFee({_grossSharesAmount: grossSharesAmount});
+            feeSharesAmount = feeHandler.settleEntranceFeeGivenGrossShares({_grossSharesAmount: grossSharesAmount});
         } else {
-            feeSharesAmount = feeHandler.settleExitFee({_grossSharesAmount: grossSharesAmount});
+            feeSharesAmount = feeHandler.settleExitFeeGivenGrossShares({_grossSharesAmount: grossSharesAmount});
         }
 
         // Return value is the shares amount, but value owed is in value asset

@@ -196,7 +196,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
             // Settle any exit fee
             uint256 feeSharesAmount = address(feeHandler) == address(0)
                 ? 0
-                : feeHandler.settleExitFee({_grossSharesAmount: request.sharesAmount});
+                : feeHandler.settleExitFeeGivenGrossShares({_grossSharesAmount: request.sharesAmount});
 
             // Calculate net shares
             uint256 netShares = request.sharesAmount - feeSharesAmount;

@@ -431,7 +431,8 @@ contract ValuationHandlerTest is TestHelpers {
             uint256 totalPositionsValue = uint256(_untrackedValue) + uint256(trackedPositionsValue);
 
             vm.expectCall(
-                feeHandler, abi.encodeWithSelector(IFeeHandler.settleDynamicFees.selector, totalPositionsValue)
+                feeHandler,
+                abi.encodeWithSelector(IFeeHandler.settleDynamicFeesGivenPositionsValue.selector, totalPositionsValue)
             );
         }
 

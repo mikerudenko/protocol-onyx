@@ -239,7 +239,7 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
         uint256 totalFeesOwed;
         address feeHandler = shares.getFeeHandler();
         if (feeHandler != address(0)) {
-            IFeeHandler(feeHandler).settleDynamicFees({_totalPositionsValue: totalPositionsValue});
+            IFeeHandler(feeHandler).settleDynamicFeesGivenPositionsValue({_totalPositionsValue: totalPositionsValue});
             totalFeesOwed = IFeeHandler(feeHandler).getTotalValueOwed();
         }
 

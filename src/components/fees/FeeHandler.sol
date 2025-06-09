@@ -98,11 +98,11 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
 
     error FeeHandler__SetPerformanceFee__RecipientZeroAddress();
 
-    error FeeHandler__SettleDynamicFees__Unauthorized();
+    error FeeHandler__SettleDynamicFeesGivenPositionsValue__Unauthorized();
 
-    error FeeHandler__SettleEntranceFee__Unauthorized();
+    error FeeHandler__SettleEntranceFeeGivenGrossShares__Unauthorized();
 
-    error FeeHandler__SettleExitFee__Unauthorized();
+    error FeeHandler__SettleExitFeeGivenGrossShares__Unauthorized();
 
     //==================================================================================================================
     // Config (access: Shares admin or owner)
@@ -193,9 +193,10 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     //==================================================================================================================
 
     /// @dev Callable by: ValuationHandler
-    function settleDynamicFees(uint256 _totalPositionsValue) external override {
+    function settleDynamicFeesGivenPositionsValue(uint256 _totalPositionsValue) external override {
         require(
-            msg.sender == Shares(__getShares()).getValuationHandler(), FeeHandler__SettleDynamicFees__Unauthorized()
+            msg.sender == Shares(__getShares()).getValuationHandler(),
+            FeeHandler__SettleDynamicFeesGivenPositionsValue__Unauthorized()
         );
 
         // Deduct unclaimed fees
@@ -226,15 +227,28 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     }
 
     /// @dev Callable by: DepositHandler
-    function settleEntranceFee(uint256 _grossSharesAmount) external override returns (uint256 feeSharesAmount_) {
-        require(Shares(__getShares()).isDepositHandler(msg.sender), FeeHandler__SettleEntranceFee__Unauthorized());
+    function settleEntranceFeeGivenGrossShares(uint256 _grossSharesAmount)
+        external
+        override
+        returns (uint256 feeSharesAmount_)
+    {
+        require(
+            Shares(__getShares()).isDepositHandler(msg.sender),
+            FeeHandler__SettleEntranceFeeGivenGrossShares__Unauthorized()
+        );
 
         return __settleEntranceExitFee({_grossSharesAmount: _grossSharesAmount, _isEntrance: true});
     }
 
     /// @dev Callable by: RedeemHandler
-    function settleExitFee(uint256 _grossSharesAmount) external override returns (uint256 feeSharesAmount_) {
-        require(Shares(__getShares()).isRedeemHandler(msg.sender), FeeHandler__SettleExitFee__Unauthorized());
+    function settleExitFeeGivenGrossShares(uint256 _grossSharesAmount)
+        external
+        override
+        returns (uint256 feeSharesAmount_)
+    {
+        require(
+            Shares(__getShares()).isRedeemHandler(msg.sender), FeeHandler__SettleExitFeeGivenGrossShares__Unauthorized()
+        );
 
         return __settleEntranceExitFee({_grossSharesAmount: _grossSharesAmount, _isEntrance: false});
     }
