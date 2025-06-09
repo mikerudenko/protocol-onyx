@@ -21,8 +21,9 @@ import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 
 /// @title Shares Contract
 /// @author Enzyme Foundation <security@enzyme.finance>
-/// @notice Shares token with issuance-related logic
-/// @dev Security notes:
+/// @notice Shares token with registries and issuance-related logic
+/// @dev The core-most contract.
+/// Security notes:
 /// - there are no built-in protections against:
 ///   - a very low totalSupply() (e.g., "inflation attack")
 ///   - a very low share value
@@ -33,6 +34,12 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // Types
     //==================================================================================================================
 
+    /// @dev Options for restricting allowed recipients of deposits and transfers of shares
+    /// `None`: deposits and transfers are not restricted
+    /// `RestrictedNoTransfers`: deposits are restricted to the allowed holders list, no transfers are allowed
+    /// `RestrictedWithTransfers`: deposits and transfers are restricted to the allowed holders list
+    /// Transfers are restricted at the ERC20 level, i.e., validated during transfer() and transferFrom().
+    /// Deposits are not restricted automatically, and must be restricted by deposit handlers.
     enum HolderRestriction {
         None,
         RestrictedNoTransfers,
@@ -46,10 +53,22 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     bytes32 private immutable SHARES_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("Shares");
 
     /// @custom:storage-location erc7201:enzyme.Shares
+    /// @param valueAsset A representation of the asset of account in which core values are reported (e.g., USD)
+    /// @param depositAssetsDest The account to which deposits are transferred
+    /// @param holderRestriction The restriction option for who can deposit and receive shares transfers
+    /// @param redeemAssetsSrc The account from which assets are withdrawn to fulfill redemptions
+    /// @param feeAssetsSrc The account from which assets are withdrawn to fulfill fee claims
+    /// @param feeHandler The contract that handles fees (settlement, claims, accounting)
+    /// @param valuationHandler The contract that handles valuation-related operations
+    /// @param isDepositHandler True if the account is an allowed deposit handler
+    /// @param isRedeemHandler True if the account is an allowed redeem handler
+    /// @param isAdmin True if the account is an admin
+    /// @param isAllowedHolder True if the account is an allowed holder (used in tandem with holderRestriction)
+    /// @dev `valueAsset` is not used within the system, but is stored on-chain in case needed by integrators.
     struct SharesStorage {
         bytes32 valueAsset;
         address depositAssetsDest;
-        HolderRestriction holderRestriction; // packed with `depositAssetsDest` since they are called together during deposits
+        HolderRestriction holderRestriction;
         address redeemAssetsSrc;
         address feeAssetsSrc;
         address feeHandler;
@@ -85,13 +104,13 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event DepositHandlerRemoved(address depositHandler);
 
-    event RedeemAssetsSrcSet(address src);
-
     event FeeAssetsSrcSet(address src);
 
     event FeeHandlerSet(address feeHandler);
 
     event HolderRestrictionSet(HolderRestriction holderRestriction);
+
+    event RedeemAssetsSrcSet(address src);
 
     event RedeemHandlerAdded(address redeemHandler);
 
@@ -173,6 +192,11 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // Initialize
     //==================================================================================================================
 
+    /// @notice Initializer for the contract
+    /// @param _owner The account to be the "owner" role
+    /// @param _name The name of the Shares token (ERC20)
+    /// @param _symbol The symbol of the Shares token (ERC20)
+    /// @param _valueAsset The representation of the asset of account for valuations (e.g., USD)
     function init(address _owner, string memory _name, string memory _symbol, bytes32 _valueAsset)
         external
         initializer
@@ -190,32 +214,35 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // ERC20 overrides
     //==================================================================================================================
 
+    /// @notice Standard ERC20 transfer of shares
     /// @dev ERC20 override: validate recipient
-    function transfer(address _to, uint256 _value) public override returns (bool) {
+    function transfer(address _to, uint256 _amount) public override returns (bool) {
         __validateTransferRecipient({_who: _to});
 
-        return super.transfer(_to, _value);
+        return super.transfer(_to, _amount);
     }
 
+    /// @notice Standard ERC20 transferFrom of shares
     /// @dev ERC20 override: validate recipient
-    function transferFrom(address _from, address _to, uint256 _value) public override returns (bool) {
+    function transferFrom(address _from, address _to, uint256 _amount) public override returns (bool) {
         __validateTransferRecipient({_who: _to});
 
-        return super.transferFrom(_from, _to, _value);
+        return super.transferFrom(_from, _to, _amount);
     }
 
     //==================================================================================================================
     // ERC20-like extensions (access: mixed)
     //==================================================================================================================
 
-    /// @dev Allows unvalidated transfer of shares from trusted handlers.
-    /// Any validation of the recipient must be done by the calling contract.
+    /// @notice Unvalidated transfer of shares from trusted handlers.
+    /// @dev Any validation of the recipient must be done by the calling contract.
     function authTransfer(address _to, uint256 _amount) external {
         require(isDepositHandler(msg.sender) || isRedeemHandler(msg.sender), Shares__AuthTransfer__Unauthorized());
 
         _transfer(msg.sender, _to, _amount);
     }
 
+    /// @notice Forces transfer of shares
     /// @dev Sometimes a compliance requirement, and simpler than using both deposit+redeem handler permissions.
     /// Not subject to transfer rules.
     function forceTransferFrom(address _from, address _to, uint256 _amount) external onlyAdminOrOwner {
@@ -365,10 +392,18 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // Valuation
     //==================================================================================================================
 
+    /// @notice Returns the latest share price and its timestamp
+    /// @return price_ The share price
+    /// @return timestamp_ The timestamp of the share price
+    /// @dev 18-decimals of precision
     function sharePrice() external view returns (uint256 price_, uint256 timestamp_) {
         return IValuationHandler(getValuationHandler()).getSharePrice();
     }
 
+    /// @notice Returns the latest share value and its timestamp
+    /// @return value_ The share value
+    /// @return timestamp_ The timestamp of the share value
+    /// @dev 18-decimals of precision
     function shareValue() external view returns (uint256 value_, uint256 timestamp_) {
         return IValuationHandler(getValuationHandler()).getShareValue();
     }
@@ -410,6 +445,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     // ALLOWED DEPOSIT AND TRANSFER RECIPIENTS
 
+    /// @notice Returns whether an account is allowed to receive shares from a deposit
     /// @dev Allowed if:
     /// A. holders are unrestricted
     /// B. user has been added as an allowed holder
@@ -417,6 +453,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         return getHolderRestriction() == HolderRestriction.None || isAllowedHolder(_who);
     }
 
+    /// @notice Returns whether an account is allowed to receive shares from a transfer
     /// @dev Allowed if:
     /// A. holders are unrestricted
     /// B. recipient is an authorized redeem handler (i.e., for async shares requests)
@@ -434,6 +471,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // Misc
     //==================================================================================================================
 
+    /// @notice Returns whether an account has either an "admin" or "owner" role
     function isAdminOrOwner(address _who) public view returns (bool) {
         return _who == owner() || isAdmin(_who);
     }
@@ -442,50 +480,61 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // State getters
     //==================================================================================================================
 
-    /// @dev Non-standard to have getter revert, but prevents sending to address(0)
+    /// @notice Returns the destination for assets received from deposits
+    /// @dev Reverts if unset in order to prevent sending assets to address(0)
     function getDepositAssetsDest() public view returns (address) {
         address depositAssetsDest = __getSharesStorage().depositAssetsDest;
         require(depositAssetsDest != address(0), Shares__GetDepositAssetsDest__NotSet());
 
-        return __getSharesStorage().depositAssetsDest;
+        return depositAssetsDest;
     }
 
+    /// @notice Returns the source for assets used for fee claims
     function getFeeAssetsSrc() public view returns (address) {
         return __getSharesStorage().feeAssetsSrc;
     }
 
+    /// @notice Returns the contract that handles fees logic
     function getFeeHandler() public view returns (address) {
         return __getSharesStorage().feeHandler;
     }
 
+    /// @notice Returns the holder restriction option
     function getHolderRestriction() public view returns (HolderRestriction) {
         return __getSharesStorage().holderRestriction;
     }
 
+    /// @notice Returns the source for assets used for redemptions
     function getRedeemAssetsSrc() public view returns (address) {
         return __getSharesStorage().redeemAssetsSrc;
     }
 
+    /// @notice Returns the contract the handles valuation logic
     function getValuationHandler() public view returns (address) {
         return __getSharesStorage().valuationHandler;
     }
 
+    /// @notice Returns the encoded representation of the asset of account (e.g., USD, ETH)
     function getValueAsset() public view returns (bytes32) {
         return __getSharesStorage().valueAsset;
     }
 
+    /// @notice Returns whether an account has an "admin" role
     function isAdmin(address _who) public view returns (bool) {
         return __getSharesStorage().isAdmin[_who];
     }
 
+    /// @notice Returns whether an account is on the "allowed holders" list
     function isAllowedHolder(address _who) public view returns (bool) {
         return __getSharesStorage().isAllowedHolder[_who];
     }
 
+    /// @notice Returns whether an account is an allowed deposit handler
     function isDepositHandler(address _who) public view returns (bool) {
         return __getSharesStorage().isDepositHandler[_who];
     }
 
+    /// @notice Returns whether an account is an allowed redeem handler
     function isRedeemHandler(address _who) public view returns (bool) {
         return __getSharesStorage().isRedeemHandler[_who];
     }
