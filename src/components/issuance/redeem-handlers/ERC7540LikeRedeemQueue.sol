@@ -77,15 +77,11 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
     // Errors
     //==================================================================================================================
 
-    error ERC7540LikeRedeemQueue__NotImplemented();
-
     error ERC7540LikeRedeemQueue__CancelRequest__MinRequestDurationNotElapsed();
 
     error ERC7540LikeRedeemQueue__CancelRequest__Unauthorized();
 
     error ERC7540LikeRedeemQueue__ExecuteRedeemRequests__ZeroAssets();
-
-    error ERC7540LikeRedeemQueue__PendingRedeemRequest__RequestControllerMismatch();
 
     error ERC7540LikeRedeemQueue__RequestRedeem__OwnerNotController();
 
@@ -126,20 +122,6 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
         Shares(__getShares()).authTransfer({_to: request.controller, _amount: shares_});
 
         emit RedeemRequestCanceled({requestId: _requestId});
-    }
-
-    /// @dev This redeem queue always pushes claimable assets upon execution
-    function claimableRedeemRequest(uint256, address) external pure returns (uint256 shares_) {
-        return 0;
-    }
-
-    function pendingRedeemRequest(uint256 _requestId, address _controller) external view returns (uint256 shares_) {
-        RedeemRequestInfo memory request = getRedeemRequest({_requestId: _requestId});
-        require(
-            _controller == request.controller, ERC7540LikeRedeemQueue__PendingRedeemRequest__RequestControllerMismatch()
-        );
-
-        return request.sharesAmount;
     }
 
     /// @dev _controller, _owner, and msg.sender must all be the same. Support for distinct values may be added later.
