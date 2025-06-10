@@ -25,13 +25,13 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
 
     struct Item {
         // 1st slot
-        uint24 id;
-        uint24 index;
+        int128 totalValue;
         int128 settledValue;
         // 2nd slot
-        int128 totalValue;
-        uint64 start;
-        uint64 duration; // in seconds
+        uint24 id;
+        uint24 index;
+        uint40 start;
+        uint32 duration;
     }
 
     //==================================================================================================================
@@ -59,7 +59,7 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     // Events
     //==================================================================================================================
 
-    event ItemAdded(uint24 id, int128 totalValue, uint64 start, uint64 duration);
+    event ItemAdded(uint24 id, int128 totalValue, uint40 start, uint32 duration);
 
     event ItemRemoved(uint24 id);
 
@@ -80,7 +80,7 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     //==================================================================================================================
 
     /// @dev _duration of 0, indicate a discrete value change at their timestamp
-    function addItem(int128 _totalValue, uint64 _start, uint64 _duration)
+    function addItem(int128 _totalValue, uint40 _start, uint32 _duration)
         external
         onlyAdminOrOwner
         returns (uint24 id_)
@@ -93,7 +93,7 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
 
         $.ids.push(id_);
         $.idToItem[id_] =
-            Item({id: id_, index: index, settledValue: 0, totalValue: _totalValue, start: _start, duration: _duration});
+            Item({totalValue: _totalValue, settledValue: 0, id: id_, index: index, start: _start, duration: _duration});
 
         emit ItemAdded({id: id_, totalValue: _totalValue, start: _start, duration: _duration});
     }
@@ -129,30 +129,30 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     // Position value
     //==================================================================================================================
 
+    function calcItemValue(uint24 _id) public view returns (int256 value_) {
+        Item memory item = getItem({_id: _id});
+
+        // Handle cases outside of start and stop bounds
+        if (block.timestamp <= item.start) {
+            return item.settledValue;
+        } else if (block.timestamp >= item.start + item.duration) {
+            return item.settledValue + item.totalValue;
+        }
+
+        uint256 lapsed = block.timestamp - item.start;
+
+        int256 proRatedValue = item.totalValue * int256(lapsed) / int256(uint256(item.duration));
+
+        return item.settledValue + proRatedValue;
+    }
+
     function getPositionValue() external view override returns (int256 value_) {
         uint24[] memory ids = getItemIds();
         for (uint256 i; i < ids.length; i++) {
-            Item memory item = getItem({_id: ids[i]});
-
-            value_ += calcItemValue({_item: item});
+            value_ += calcItemValue({_id: ids[i]});
         }
 
         return value_;
-    }
-
-    function calcItemValue(Item memory _item) public view returns (int256 value_) {
-        // Handle cases outside of start and stop bounds
-        if (block.timestamp <= _item.start) {
-            return _item.settledValue;
-        } else if (block.timestamp >= _item.start + _item.duration) {
-            return _item.settledValue + _item.totalValue;
-        }
-
-        uint256 lapsed = block.timestamp - _item.start;
-
-        int256 proRatedValue = _item.totalValue * int256(lapsed) / int256(uint256(_item.duration));
-
-        return _item.settledValue + proRatedValue;
     }
 
     //==================================================================================================================

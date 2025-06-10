@@ -66,7 +66,7 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
         __test_addItem_success({_totalValue: -100, _start: 123, _duration: 456});
     }
 
-    function __test_addItem_success(int128 _totalValue, uint64 _start, uint64 _duration) internal {
+    function __test_addItem_success(int128 _totalValue, uint40 _start, uint32 _duration) internal {
         uint24 expectedId = tracker.getLastItemId() + 1;
         uint24[] memory prevItemIds = tracker.getItemIds();
         uint256 prevItemsCount = prevItemIds.length;
@@ -199,8 +199,8 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
 
     function test_updateSettledValue_success() public {
         int128 totalValue = 100;
-        uint64 start = 123;
-        uint64 duration = 456;
+        uint40 start = 123;
+        uint32 duration = 456;
         int128 totalSettled = 1234;
 
         // Add a few items
@@ -256,16 +256,16 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
         vm.startPrank(admin);
         uint24 futureItemId = tracker.addItem({
             _totalValue: futureItemTotalValue,
-            _start: uint64(currentTime + 1),
-            _duration: uint64(1000)
+            _start: uint40(currentTime + 1),
+            _duration: uint32(1000)
         });
         uint24 midwayItemId = tracker.addItem({
             _totalValue: midwayItemTotalValue,
-            _start: uint64(currentTime - 10),
-            _duration: uint64(20)
+            _start: uint40(currentTime - 10),
+            _duration: uint32(20)
         });
         uint24 pastItemId =
-            tracker.addItem({_totalValue: pastItemTotalValue, _start: uint64(currentTime - 1000), _duration: 999});
+            tracker.addItem({_totalValue: pastItemTotalValue, _start: uint40(currentTime - 1000), _duration: 999});
         tracker.updateSettledValue({_id: futureItemId, _totalSettled: futureItemTotalSettled});
         tracker.updateSettledValue({_id: midwayItemId, _totalSettled: midwayItemTotalSettled});
         tracker.updateSettledValue({_id: pastItemId, _totalSettled: pastItemTotalSettled});
