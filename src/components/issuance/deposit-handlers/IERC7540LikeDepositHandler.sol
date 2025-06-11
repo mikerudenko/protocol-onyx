@@ -22,6 +22,11 @@ interface IERC7540LikeDepositHandler {
         address indexed controller, address indexed owner, uint256 indexed requestId, address sender, uint256 assets
     );
 
+    /// @notice Creates a new deposit request
+    /// @param _assets The amount of assets to deposit
+    /// @param _controller The account that will own the request
+    /// @param _owner The account that owns the assets to be used in the deposit request
+    /// @return requestId_ The id of the request
     function requestDeposit(uint256 _assets, address _controller, address _owner)
         external
         returns (uint256 requestId_);
@@ -42,8 +47,17 @@ interface IERC7540LikeDepositHandler {
 
     event DepositRequestReferred(uint256 requestId, bytes32 referrer);
 
+    /// @notice Cancels a deposit request
+    /// @param _requestId The id of the request to cancel
+    /// @return assets_ The amount of assets that were returned
     function cancelDeposit(uint256 _requestId) external returns (uint256 assets_);
 
+    /// @notice Creates a new deposit request with a referrer
+    /// @param _assets The amount of assets to deposit
+    /// @param _controller The account that will own the request
+    /// @param _owner The account that owns the assets to be used in the deposit request
+    /// @param _referrer The referrer of the deposit request
+    /// @return requestId_ The id of the request
     function requestDepositReferred(uint256 _assets, address _controller, address _owner, bytes32 _referrer)
         external
         returns (uint256 requestId_);

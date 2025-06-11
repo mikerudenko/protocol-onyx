@@ -37,12 +37,18 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     // Types
     //==================================================================================================================
 
+    /// @dev Stores information about the oracle used to convert a given asset to/from the Shares value asset
+    /// @param oracle The address of the oracle contract
+    /// @param quotedInValueAsset True if, e.g., value asset is USD and oracle is ETH/USD; false if USD/ETH
+    /// @param timestampTolerance The duration of validity for the oracle's rate (in seconds)
+    /// @param oracleDecimals (cache) The number of decimals in the oracle rate's precision
+    /// @param assetDecimals (cache) The number of decimals in the asset's precision
     struct AssetOracleInfo {
         address oracle;
-        bool quotedInValueAsset; // true if, e.g., value asset is USD and oracle is ETH/USD; false if USD/ETH
-        uint24 timestampTolerance; // seconds
-        uint8 oracleDecimals; // cache
-        uint8 assetDecimals; // cache
+        bool quotedInValueAsset;
+        uint24 timestampTolerance;
+        uint8 oracleDecimals;
+        uint8 assetDecimals;
     }
 
     //==================================================================================================================
@@ -53,6 +59,10 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
         StorageHelpersLib.deriveErc7201Location("ValuationHandler");
 
     /// @custom:storage-location erc7201:enzyme.ValuationHandler
+    /// @param positionTrackers The set of IPositionTracker contracts queried to aggregate on-chain "tracked value"
+    /// @param assetToOracle A mapping of assets to their oracle information
+    /// @param lastShareValue The share value at most recent update (18-decimal precision)
+    /// @param lastShareValueTimestamp The timestamp when lastShareValue was stored
     struct ValuationHandlerStorage {
         EnumerableSet.AddressSet positionTrackers;
         mapping(address => AssetOracleInfo) assetToOracle;
@@ -113,6 +123,11 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
         emit PositionTrackerRemoved(_positionTracker);
     }
 
+    /// @notice Sets the oracle to convert a given asset to/from the Shares value asset
+    /// @param _asset The asset
+    /// @param _oracle The oracle contract
+    /// @param _quotedInValueAsset True if the oracle rate is quoted in the value asset, false if in _asset
+    /// @param _timestampTolerance The duration of validity for the oracle's rate (in seconds)
     function setAssetOracle(address _asset, address _oracle, bool _quotedInValueAsset, uint24 _timestampTolerance)
         external
         onlyAdminOrOwner
@@ -210,6 +225,8 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     // Share value updates (access: admin or owner)
     //==================================================================================================================
 
+    /// @notice Updates the share value by aggregating the given untracked positions value with tracked on-chain value,
+    /// and settling dynamic fees.
     /// @dev _untrackedPositionsValue and netShareValue_ are 18-decimal precision.
     /// If no shares exist:
     /// - logic still runs

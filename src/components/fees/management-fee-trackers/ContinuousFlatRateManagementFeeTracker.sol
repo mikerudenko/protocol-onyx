@@ -32,8 +32,10 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
         StorageHelpersLib.deriveErc7201Location("ManagementFeeTracker");
 
     /// @custom:storage-location erc7201:enzyme.storage.ManagementFeeTracker
+    /// @param rate Management fee rate as an annualized percentage of net value
+    /// @param lastSettled Timestamp of the last settlement
     struct ManagementFeeTrackerStorage {
-        uint16 rate; // annualized, in bps
+        uint16 rate;
         uint64 lastSettled;
     }
 
@@ -64,13 +66,15 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
     // Config (access: Shares admin or owner)
     //==================================================================================================================
 
-    /// @dev Used to set the last settled timestamp to the current block timestamp.
-    /// Must be called once before first settlement.
+    /// @notice Sets the last settled timestamp to the current block timestamp
+    /// @dev Must be called once before first settlement
     function resetLastSettled() external onlyAdminOrOwner {
         __settle({_valueDue: 0});
     }
 
-    /// @dev Updating rate will apply the new rate on any time since last settlement
+    /// @notice Sets the management fee rate
+    /// @dev Updating rate will apply the new rate on any time since last settlement,
+    /// i.e., it does not automatically settle with the old rate at the current timestamp
     function setRate(uint16 _rate) external onlyAdminOrOwner {
         require(_rate < ONE_HUNDRED_PERCENT_BPS, ContinuousFlatRateManagementFeeTracker__SetRate__ExceedsMax());
 
@@ -84,6 +88,7 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
     // Settlement
     //==================================================================================================================
 
+    /// @inheritdoc IManagementFeeTracker
     function settleManagementFee(uint256 _netValue) external onlyFeeHandler returns (uint256 valueDue_) {
         uint256 lastSettled = getLastSettled();
         require(
@@ -109,10 +114,12 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
     // State getters
     //==================================================================================================================
 
+    /// @notice Returns the last settled timestamp
     function getLastSettled() public view returns (uint256) {
         return __getManagementFeeTrackerStorage().lastSettled;
     }
 
+    /// @notice Returns the management fee rate
     function getRate() public view returns (uint256) {
         return __getManagementFeeTrackerStorage().rate;
     }

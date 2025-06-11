@@ -136,9 +136,10 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     }
 
     //==================================================================================================================
-    // Required: IERC7540DepositHandler
+    // Required: IERC7540LikeDepositHandler
     //==================================================================================================================
 
+    /// @inheritdoc IERC7540LikeDepositHandler
     function cancelDeposit(uint256 _requestId) external returns (uint256 assets_) {
         DepositRequestInfo memory request = getDepositRequest({_requestId: _requestId});
 
@@ -160,6 +161,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
         emit DepositRequestCanceled({requestId: _requestId});
     }
 
+    /// @inheritdoc IERC7540LikeDepositHandler
     function requestDeposit(uint256 _assets, address _controller, address _owner)
         external
         returns (uint256 requestId_)
@@ -167,6 +169,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
         return __requestDeposit({_assets: _assets, _controller: _controller, _owner: _owner});
     }
 
+    /// @inheritdoc IERC7540LikeDepositHandler
     function requestDepositReferred(uint256 _assets, address _controller, address _owner, bytes32 _referrer)
         external
         returns (uint256 requestId_)
@@ -215,6 +218,8 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     // Request fulfillment
     //==================================================================================================================
 
+    /// @notice Executes a list of requests, resulting in shares being issued to each request's controller
+    /// @param _requestIds The ids of the requests to execute
     function executeDepositRequests(uint256[] memory _requestIds) external onlyAdminOrOwner {
         Shares shares = Shares(__getShares());
         IFeeHandler feeHandler = IFeeHandler(shares.getFeeHandler());
@@ -281,22 +286,18 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     // State getters
     //==================================================================================================================
 
-    /// @notice Gets the id of the most recent deposit request
-    /// @return requestId_ The id
+    /// @notice Returns the id of the most recently-created deposit request
     function getDepositLastId() public view returns (uint256 requestId_) {
         return __getDepositQueueStorage().lastId;
     }
 
-    /// @notice Gets the min time duration before a deposit request is cancelable
-    /// @return minRequestDuration_ The duration
-    function getDepositMinRequestDuration() public view returns (uint24 minRequestDuration_) {
+    /// @notice Returns the minimum time duration before a deposit request is cancelable
+    function getDepositMinRequestDuration() public view returns (uint24) {
         return __getDepositQueueStorage().minRequestDuration;
     }
 
-    /// @notice Gets the deposit request for a given id
-    /// @param _requestId The id of the request
-    /// @return request_ The request
-    function getDepositRequest(uint256 _requestId) public view returns (DepositRequestInfo memory request_) {
+    /// @notice Returns the deposit request for a given request id
+    function getDepositRequest(uint256 _requestId) public view returns (DepositRequestInfo memory) {
         return __getDepositQueueStorage().idToRequest[_requestId];
     }
 

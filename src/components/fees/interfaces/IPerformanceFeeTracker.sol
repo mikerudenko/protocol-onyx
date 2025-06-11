@@ -15,5 +15,8 @@ pragma solidity 0.8.28;
 /// @author Enzyme Foundation <security@enzyme.finance>
 /// @dev Keep namespaces specific so management and performance fee could be handled by same contract
 interface IPerformanceFeeTracker {
+    /// @notice Settles the performance fee
+    /// @param _netValue Net value of the portfolio, in shares value asset
+    /// @return valueDue_ The performance fee due, in shares value asset
     function settlePerformanceFee(uint256 _netValue) external returns (uint256 valueDue_);
 }

@@ -37,8 +37,10 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
         StorageHelpersLib.deriveErc7201Location("PerformanceFeeTracker");
 
     /// @custom:storage-location erc7201:enzyme.storage.PerformanceFeeTracker
+    /// @param rate Performance fee rate as a percentage of share value increase
+    /// @param highWaterMark Current high water mark (share price at last settlement), in shares value asset (18-decimal precision)
     struct PerformanceFeeTrackerStorage {
-        uint16 rate; // annualized, in bps
+        uint16 rate;
         uint128 highWaterMark;
     }
 
@@ -71,8 +73,8 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
     // Config (access: Shares admin or owner)
     //==================================================================================================================
 
-    /// @dev Used to set the high water mark to the current share price.
-    /// Does not validate share price timestamp freshness.
+    /// @notice Sets the high water mark to the current share price.
+    /// @dev Does not validate share price timestamp freshness.
     /// Must be called once before first settlement.
     function resetHighWaterMark() external onlyAdminOrOwner {
         (uint256 price,) = Shares(__getShares()).sharePrice();
@@ -80,6 +82,8 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
         __updateHighWaterMark({_sharePrice: price});
     }
 
+    /// @notice Sets the performance fee rate.
+    /// @param _rate Performance fee rate
     function setRate(uint16 _rate) external onlyAdminOrOwner {
         require(_rate < ONE_HUNDRED_PERCENT_BPS, ContinuousFlatRatePerformanceFeeTracker__SetRate__ExceedsMax());
 
@@ -93,6 +97,7 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
     // Settlement
     //==================================================================================================================
 
+    /// @inheritdoc IPerformanceFeeTracker
     function settlePerformanceFee(uint256 _netValue) external onlyFeeHandler returns (uint256 valueDue_) {
         // Always require an initial hwm to be set
         uint256 hwm = getHighWaterMark();
@@ -142,10 +147,12 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
     // State getters
     //==================================================================================================================
 
+    /// @notice Returns the current high water mark, a share price in the share value asset
     function getHighWaterMark() public view returns (uint256) {
         return __getPerformanceFeeTrackerStorage().highWaterMark;
     }
 
+    /// @notice Returns the performance fee rate
     function getRate() public view returns (uint16) {
         return __getPerformanceFeeTrackerStorage().rate;
     }

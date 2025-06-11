@@ -48,6 +48,8 @@ library ValueHelpersLib {
         return (SHARES_PRECISION * _totalValue) / _totalSharesAmount;
     }
 
+    /// @dev Converts a base amount into a target (quote) amount, using a known rate.
+    /// `_rateQuotedInBase` is true if the rate is quoted in the base value, false if in the quote value.
     function convert(
         uint256 _baseAmount,
         uint256 _basePrecision,
@@ -67,6 +69,9 @@ library ValueHelpersLib {
 
     // CHAINLINK AGGREGATOR HELPERS
 
+    /// @dev Converts an amount of the Shares "value asset" (18-decimals precision) into a target (quote) asset amount,
+    /// using a chainlink-like aggregator rate. Returned value is in the quote asset's precision.
+    /// `_oracleQuotedInValueAsset` is true if the rate is quoted in the value asset, false if in the quote value.
     function convertFromValueAssetWithAggregatorV3(
         uint256 _value,
         uint256 _quotePrecision,
@@ -86,6 +91,9 @@ library ValueHelpersLib {
         });
     }
 
+    /// @dev Converts an amount of a base asset into an amount of the Shares "value asset".
+    /// using a chainlink-like aggregator rate. Returned value has 18-decimals precision.
+    /// `_oracleQuotedInValueAsset` is true if the rate is quoted in the value asset, false if in the base asset.
     function convertToValueAssetWithAggregatorV3(
         uint256 _baseAmount,
         uint256 _basePrecision,
@@ -105,6 +113,8 @@ library ValueHelpersLib {
         });
     }
 
+    /// @dev Converts an amount of a base asset into an amount of a quote asset, using a chainlink-like aggregator rate.
+    /// Returned value is in the quote asset's precision.
     function convertWithAggregatorV3(
         uint256 _baseAmount,
         uint256 _basePrecision,
@@ -127,6 +137,9 @@ library ValueHelpersLib {
         });
     }
 
+    /// @dev Parses the rate from a chainlink-like aggregator, validating that:
+    /// - rate > 0
+    /// - the aggregator's timestamp is within the specified duration of validity (`_timestampTolerance`)
     function parseValidatedRateFromAggregatorV3(address _aggregator, uint256 _timestampTolerance)
         internal
         view

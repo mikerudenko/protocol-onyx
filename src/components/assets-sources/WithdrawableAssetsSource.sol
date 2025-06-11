@@ -25,13 +25,16 @@ contract WithdrawableAssetsSource is ComponentHelpersMixin {
 
     event AssetWithdrawn(address asset, address to, uint256 amount);
 
-    /// @dev Any caller
+    /// @notice Grants a max allowance to the Shares contract for the given ERC20 token
+    /// @dev Callable by: anybody
     function approveMaxToShares(address _asset) external {
         IERC20(_asset).forceApprove(__getShares(), type(uint256).max);
 
         emit AssetApproved(_asset);
     }
 
+    /// @notice Withdraws the specified amount of the given asset to the specified address
+    /// @dev Allows rescuing asset surplus
     function withdrawAsset(address _asset, address _to, uint256 _amount) external onlyAdminOrOwner {
         IERC20(_asset).safeTransfer(_to, _amount);
 

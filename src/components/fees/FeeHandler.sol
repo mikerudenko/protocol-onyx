@@ -33,14 +33,25 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     bytes32 private immutable FEE_HANDLER_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("FeeHandler");
 
     /// @custom:storage-location erc7201:enzyme.FeeHandler
+    /// @param managementFeeTracker IManagementFeeTracker contract address
+    /// @param performanceFeeTracker IPerformanceFeeTracker contract address
+    /// @param managementFeeRecipient Recipient of management fees
+    /// @param performanceFeeRecipient Recipient of performance fees
+    /// @param entranceFeeRecipient Recipient of entrance fees (burned if `address(0)`)
+    /// @param entranceFeeBps Entrance fee percentage
+    /// @param exitFeeRecipient Recipient of exit fees (burned if `address(0)`)
+    /// @param exitFeeBps Exit fee percentage
+    /// @param feeAsset ERC20 asset used to pay out fees
+    /// @param totalFeesOwed Total fees owed, in Shares value asset (18-decimal precision)
+    /// @param userFeesOwed Fees owed per user, in Shares value asset (18-decimal precision)
     struct FeeHandlerStorage {
         address managementFeeTracker;
         address performanceFeeTracker;
-        address managementFeeRecipient; // cannot be address(0)
-        address performanceFeeRecipient; // cannot be address(0)
-        address entranceFeeRecipient; // "burned" if address(0)
+        address managementFeeRecipient;
+        address performanceFeeRecipient;
+        address entranceFeeRecipient;
         uint16 entranceFeeBps;
-        address exitFeeRecipient; // "burned" if address(0)
+        address exitFeeRecipient;
         uint16 exitFeeBps;
         address feeAsset;
         uint256 totalFeesOwed;
@@ -163,7 +174,13 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     // Claim Fees
     //==================================================================================================================
 
-    /// @dev Callable by: (1) owed user, or (2) admin
+    /// @notice Claims fees owed to a given user
+    /// @param _onBehalf The account for which to claim fees
+    /// @param _value The value of fees owed to claim, in the Shares value asset (18-decimal precision)
+    /// @return feeAssetAmount_ The amount of the fee asset transferred to _onBehalf
+    /// @dev Callable by: (1) owed user, or (2) admin.
+    /// Fees are paid in the current fee asset set in this contract.
+    /// Expects feeAssetAmount_ to be available in Shares' feeAssetsSrc
     function claimFees(address _onBehalf, uint256 _value) external returns (uint256 feeAssetAmount_) {
         require(msg.sender == _onBehalf || __isAdminOrOwner(msg.sender), FeeHandler__ClaimFees__Unauthorized());
         // `_value > owed` reverts in __updateValueOwed()
@@ -177,7 +194,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
 
         __updateValueOwed({_user: _onBehalf, _delta: -int256(_value)});
 
-        Shares(__getShares()).withdrawFeeAssetTo({_asset: feeAsset, _to: _onBehalf, _amount: feeAssetAmount_});
+        shares.withdrawFeeAssetTo({_asset: feeAsset, _to: _onBehalf, _amount: feeAssetAmount_});
 
         emit FeesClaimed({
             caller: msg.sender,
@@ -192,7 +209,10 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     // Settle Fees
     //==================================================================================================================
 
-    /// @dev Callable by: ValuationHandler
+    /// @notice Settles dynamic fees (management and performance fees), updating fees owed
+    /// @param _totalPositionsValue Total value of all Shares' positions, in the Shares value asset (18-decimal precision)
+    /// @dev Callable by: ValuationHandler.
+    /// `_totalPositionsValue` must not include any unclaimed fees from this contract
     function settleDynamicFeesGivenPositionsValue(uint256 _totalPositionsValue) external override {
         require(
             msg.sender == Shares(__getShares()).getValuationHandler(),
@@ -226,6 +246,9 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
         }
     }
 
+    /// @notice Settles entrance fee, updating fees owed
+    /// @param _grossSharesAmount The gross shares amount on which to calculate the fee
+    /// @return feeSharesAmount_ The settled fee amount, in shares
     /// @dev Callable by: DepositHandler
     function settleEntranceFeeGivenGrossShares(uint256 _grossSharesAmount)
         external
@@ -240,6 +263,9 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
         return __settleEntranceExitFee({_grossSharesAmount: _grossSharesAmount, _isEntrance: true});
     }
 
+    /// @notice Settles exit fee, updating fees owed
+    /// @param _grossSharesAmount The gross shares amount on which to calculate the fee
+    /// @return feeSharesAmount_ The settled fee amount, in shares
     /// @dev Callable by: RedeemHandler
     function settleExitFeeGivenGrossShares(uint256 _grossSharesAmount)
         external
@@ -311,46 +337,57 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     // State getters
     //==================================================================================================================
 
+    /// @notice Returns the entrance fee percentage
     function getEntranceFeeBps() public view returns (uint16 entranceFeeBps_) {
         return __getFeeHandlerStorage().entranceFeeBps;
     }
 
+    /// @notice Returns the entrance fee recipient
     function getEntranceFeeRecipient() public view returns (address entranceFeeRecipient_) {
         return __getFeeHandlerStorage().entranceFeeRecipient;
     }
 
+    /// @notice Returns the exit fee percentage
     function getExitFeeBps() public view returns (uint16 exitFeeBps_) {
         return __getFeeHandlerStorage().exitFeeBps;
     }
 
+    /// @notice Returns the exit fee recipient
     function getExitFeeRecipient() public view returns (address exitFeeRecipient_) {
         return __getFeeHandlerStorage().exitFeeRecipient;
     }
 
+    /// @notice Returns the asset used to pay out fee claims
     function getFeeAsset() public view returns (address feeAsset_) {
         return __getFeeHandlerStorage().feeAsset;
     }
 
+    /// @notice Returns the management fee recipient
     function getManagementFeeRecipient() public view returns (address managementFeeRecipient_) {
         return __getFeeHandlerStorage().managementFeeRecipient;
     }
 
+    /// @notice Returns the ManagementFeeTracker instance (no management fee if empty)
     function getManagementFeeTracker() public view returns (address managementFeeTracker_) {
         return __getFeeHandlerStorage().managementFeeTracker;
     }
 
+    /// @notice Returns the performance fee recipient
     function getPerformanceFeeRecipient() public view returns (address performanceFeeRecipient_) {
         return __getFeeHandlerStorage().performanceFeeRecipient;
     }
 
+    /// @notice Returns the PerformanceFeeTracker instance (no performance fee if empty)
     function getPerformanceFeeTracker() public view returns (address performanceFeeTracker_) {
         return __getFeeHandlerStorage().performanceFeeTracker;
     }
 
+    /// @notice Returns the total value of fees owed (in Shares value asset)
     function getTotalValueOwed() public view override returns (uint256 totalValueOwed_) {
         return __getFeeHandlerStorage().totalFeesOwed;
     }
 
+    /// @notice Returns the value of fees owed per user (in Shares value asset)
     function getValueOwedToUser(address _user) public view returns (uint256 valueOwed_) {
         return __getFeeHandlerStorage().userFeesOwed[_user];
     }

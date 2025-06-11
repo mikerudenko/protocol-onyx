@@ -23,6 +23,13 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     // Types
     //==================================================================================================================
 
+    /// @dev Stores information about a credit or debt line-item
+    /// @param totalValue The total value of the item (quoted in the Shares value asset), written down linearly over time
+    /// @param settledValue The settled, non-linear value of the item (quoted in the Shares value asset)
+    /// @param id The unique identifier of the item
+    /// @param index The array index of the item in `ids[]`
+    /// @param start The start timestamp of the linear write-down period
+    /// @param duration The duration of the linear write-down period (in seconds)
     struct Item {
         // 1st slot
         int128 totalValue;
@@ -42,6 +49,9 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
         StorageHelpersLib.deriveErc7201Location("LinearCreditDebtTracker");
 
     /// @custom:storage-location erc7201:enzyme.LinearCreditDebtTracker
+    /// @param lastItemId The id of the last item that was added
+    /// @param ids The list of active item ids (all items that have not been removed)
+    /// @param idToItem A mapping of item ids to their corresponding Item info
     struct LinearCreditDebtTrackerStorage {
         uint24 lastItemId; // starts from 1
         uint24[] ids;
@@ -79,7 +89,12 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     // Item management (access: Shares admin or owner)
     //==================================================================================================================
 
-    /// @dev _duration of 0, indicate a discrete value change at their timestamp
+    /// @notice Adds a new line-item to the tracker
+    /// @param _totalValue The total value of the item (quoted in the Shares value asset), written down linearly over time
+    /// @param _start The start timestamp of the linear write-down period
+    /// @param _duration The duration of the linear write-down period (in seconds)
+    /// @return id_ The id of the new line-item
+    /// @dev A _duration of 0 indicates a discrete value change at the _start timestamp
     function addItem(int128 _totalValue, uint40 _start, uint32 _duration)
         external
         onlyAdminOrOwner
@@ -98,6 +113,7 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
         emit ItemAdded({id: id_, totalValue: _totalValue, start: _start, duration: _duration});
     }
 
+    /// @notice Removes an existing line-item from the tracker
     function removeItem(uint24 _id) external onlyAdminOrOwner {
         Item memory item = getItem({_id: _id});
         require(item.id != 0, LinearCreditDebtTracker__RemoveItem__DoesNotExist());
@@ -116,6 +132,9 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
         emit ItemRemoved({id: _id});
     }
 
+    /// @notice Updates the settled value of an existing line-item, written down immediately
+    /// @param _id The line-item id
+    /// @param _totalSettled The total settled value of the line-item (quoted in the Shares value asset)
     function updateSettledValue(uint24 _id, int128 _totalSettled) external onlyAdminOrOwner {
         require(getItem({_id: _id}).id != 0, LinearCreditDebtTracker__UpdateSettledValue__DoesNotExist());
 
@@ -129,6 +148,13 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     // Position value
     //==================================================================================================================
 
+    /// @notice Calculates the value of a line-item at the current timestamp
+    /// @param _id The line-item id
+    /// @return value_ The value of the line-item (quoted in the Shares value asset)
+    /// @dev Cases:
+    /// - prior to item.start = settled value only
+    /// - while within "item.start + item.duration" = settled value + linearly pro-rated total value
+    /// - otherwise = settled value + total value
     function calcItemValue(uint24 _id) public view returns (int256 value_) {
         Item memory item = getItem({_id: _id});
 
@@ -146,6 +172,7 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
         return item.settledValue + proRatedValue;
     }
 
+    /// @inheritdoc IPositionTracker
     function getPositionValue() external view override returns (int256 value_) {
         uint24[] memory ids = getItemIds();
         for (uint256 i; i < ids.length; i++) {

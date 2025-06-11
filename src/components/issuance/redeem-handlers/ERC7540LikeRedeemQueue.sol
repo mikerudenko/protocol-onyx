@@ -103,6 +103,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
     // Required: IERC7540LikeRedeemHandler
     //==================================================================================================================
 
+    /// @inheritdoc IERC7540LikeRedeemHandler
     function cancelRedeem(uint256 _requestId) external returns (uint256 shares_) {
         RedeemRequestInfo memory request = getRedeemRequest({_requestId: _requestId});
 
@@ -124,6 +125,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
         emit RedeemRequestCanceled({requestId: _requestId});
     }
 
+    /// @inheritdoc IERC7540LikeRedeemHandler
     /// @dev _controller, _owner, and msg.sender must all be the same. Support for distinct values may be added later.
     /// This helps prevent situations like unauthorized share transfers via request cancellation.
     function requestRedeem(uint256 _shares, address _controller, address _owner)
@@ -159,6 +161,8 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
     // Request fulfillment
     //==================================================================================================================
 
+    /// @notice Executes a list of requests, resulting in redeemed assets being transferred to each request's controller
+    /// @param _requestIds The ids of the requests to execute
     function executeRedeemRequests(uint256[] memory _requestIds) external onlyAdminOrOwner {
         Shares shares = Shares(__getShares());
         IFeeHandler feeHandler = IFeeHandler(shares.getFeeHandler());
@@ -223,22 +227,18 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
     // State getters
     //==================================================================================================================
 
-    /// @notice Gets the id of the most recent redeem request
-    /// @return requestId_ The id
-    function getRedeemLastId() public view returns (uint256 requestId_) {
+    /// @notice Returns the id of the most recently-created redeem request
+    function getRedeemLastId() public view returns (uint128) {
         return __getRedeemQueueStorage().lastId;
     }
 
-    /// @notice Gets the min time duration before a redeem request is cancelable
-    /// @return minRequestDuration_ The duration
-    function getRedeemMinRequestDuration() public view returns (uint24 minRequestDuration_) {
+    /// @notice Returns the minimum time duration before a redeem request is cancelable
+    function getRedeemMinRequestDuration() public view returns (uint24) {
         return __getRedeemQueueStorage().minRequestDuration;
     }
 
-    /// @notice Gets the redeem request for a given id
-    /// @param _requestId The id of the request
-    /// @return request_ The request
-    function getRedeemRequest(uint256 _requestId) public view returns (RedeemRequestInfo memory request_) {
+    /// @notice Returns the redeem request for a given id
+    function getRedeemRequest(uint256 _requestId) public view returns (RedeemRequestInfo memory) {
         return __getRedeemQueueStorage().idToRequest[_requestId];
     }
 }
