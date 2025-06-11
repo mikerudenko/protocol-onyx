@@ -55,6 +55,55 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
     // Config (access: admin or owner)
     //==================================================================================================================
 
+    function test_addAllowedController_fail_notAdminOrOwner() public {
+        address randomUser = makeAddr("randomUser");
+        address controller = makeAddr("controller");
+
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        vm.prank(randomUser);
+        depositQueue.addAllowedController(controller);
+    }
+
+    function test_addAllowedController_success() public {
+        address controller = makeAddr("controller");
+
+        vm.expectEmit();
+        emit ERC7540LikeDepositQueue.AllowedControllerAdded({controller: controller});
+
+        vm.prank(admin);
+        depositQueue.addAllowedController(controller);
+
+        assert(depositQueue.isInAllowedControllerList(controller));
+    }
+
+    function test_removeAllowedController_fail_notAdminOrOwner() public {
+        address randomUser = makeAddr("randomUser");
+        address controller = makeAddr("controller");
+
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        vm.prank(randomUser);
+        depositQueue.removeAllowedController(controller);
+    }
+
+    function test_removeAllowedController_success() public {
+        address controller = makeAddr("controller");
+
+        vm.prank(admin);
+        depositQueue.addAllowedController(controller);
+
+        assert(depositQueue.isInAllowedControllerList(controller));
+
+        vm.expectEmit();
+        emit ERC7540LikeDepositQueue.AllowedControllerRemoved({controller: controller});
+
+        vm.prank(admin);
+        depositQueue.removeAllowedController(controller);
+
+        assert(!depositQueue.isInAllowedControllerList(controller));
+    }
+
     function test_setDepositMinRequestDuration_fail_notAdminOrOwner() public {
         address randomUser = makeAddr("randomUser");
         uint24 minRequestDuration = 123;
@@ -75,6 +124,30 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         depositQueue.setDepositMinRequestDuration(minRequestDuration);
 
         assertEq(depositQueue.getDepositMinRequestDuration(), minRequestDuration);
+    }
+
+    function test_setDepositRestriction_fail_notAdminOrOwner() public {
+        address randomUser = makeAddr("randomUser");
+        ERC7540LikeDepositQueue.DepositRestriction restriction =
+            ERC7540LikeDepositQueue.DepositRestriction.ControllerAllowlist;
+
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        vm.prank(randomUser);
+        depositQueue.setDepositRestriction(restriction);
+    }
+
+    function test_setDepositRestriction_success() public {
+        ERC7540LikeDepositQueue.DepositRestriction restriction =
+            ERC7540LikeDepositQueue.DepositRestriction.ControllerAllowlist;
+
+        vm.expectEmit();
+        emit ERC7540LikeDepositQueue.DepositRestrictionSet(restriction);
+
+        vm.prank(admin);
+        depositQueue.setDepositRestriction(restriction);
+
+        assertEq(uint8(depositQueue.getDepositRestriction()), uint8(restriction));
     }
 
     //==================================================================================================================
@@ -190,15 +263,17 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         depositQueue.requestDeposit({_assets: 0, _controller: controller, _owner: tokenOwner});
     }
 
-    function test_requestDeposit_fail_controllerNotAllowedDepositor() public {
+    function test_requestDeposit_fail_controllerNotAllowed() public {
         address controller = makeAddr("controller");
         address tokenOwner = controller;
         uint256 assetAmount = 123;
         __test_requestDeposit_setup({_tokenOwner: tokenOwner});
 
-        vm.expectRevert(
-            ERC7540LikeDepositQueue.ERC7540LikeDepositQueue__RequestDeposit__ControllerNotAllowedDepositor.selector
-        );
+        // Restrict controllers to allowlist
+        vm.prank(admin);
+        depositQueue.setDepositRestriction(ERC7540LikeDepositQueue.DepositRestriction.ControllerAllowlist);
+
+        vm.expectRevert(ERC7540LikeDepositQueue.ERC7540LikeDepositQueue__RequestDeposit__ControllerNotAllowed.selector);
         vm.prank(tokenOwner);
         depositQueue.requestDeposit({_assets: assetAmount, _controller: controller, _owner: tokenOwner});
     }
@@ -213,13 +288,23 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
             _controller: controller,
             _tokenOwner: tokenOwner,
             _assetAmount: 123,
-            _referred: false
+            _referred: false,
+            _useControllerAllowlist: false
         });
         __test_requestDeposit_success({
             _controller: controller,
             _tokenOwner: tokenOwner,
             _assetAmount: 456,
-            _referred: true
+            _referred: true,
+            _useControllerAllowlist: false
+        });
+        // For final request, use controller allowlist
+        __test_requestDeposit_success({
+            _controller: controller,
+            _tokenOwner: tokenOwner,
+            _assetAmount: 789,
+            _referred: false,
+            _useControllerAllowlist: true
         });
     }
 
@@ -227,12 +312,15 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         address _controller,
         address _tokenOwner,
         uint256 _assetAmount,
-        bool _referred
+        bool _referred,
+        bool _useControllerAllowlist
     ) internal {
-        // Add controller to depositor allowlist
-        if (!shares.isAllowedHolder(_controller)) {
+        if (_useControllerAllowlist) {
             vm.prank(admin);
-            shares.addAllowedHolder(_controller);
+            depositQueue.setDepositRestriction(ERC7540LikeDepositQueue.DepositRestriction.ControllerAllowlist);
+
+            vm.prank(admin);
+            depositQueue.addAllowedController(_controller);
         }
 
         uint256 expectedRequestId = depositQueue.getDepositLastId() + 1;
@@ -281,10 +369,6 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
     }
 
     function __test_requestDeposit_setup(address _tokenOwner) internal {
-        // Set shares to use a strict depositor allowlist with no transfers
-        vm.prank(admin);
-        shares.setHolderRestriction(Shares.HolderRestriction.RestrictedNoTransfers);
-
         // Create and set the asset
         uint8 assetDecimals = 6;
         address asset = address(new MockERC20(assetDecimals));
@@ -355,13 +439,6 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         shares_mockSharePrice({_shares: address(shares), _sharePrice: sharePrice, _timestamp: block.timestamp});
         mockOracle.setRate(valueAssetToDepositAssetRate);
         mockOracle.setTimestamp(block.timestamp);
-
-        // Shares: Add the controllers as allowed holders
-        vm.startPrank(admin);
-        shares.addAllowedHolder(request1Controller);
-        shares.addAllowedHolder(request2Controller);
-        shares.addAllowedHolder(request3Controller);
-        vm.stopPrank();
 
         // Shares: Set the deposit asset destination
         vm.prank(admin);

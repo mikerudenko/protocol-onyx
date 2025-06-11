@@ -143,7 +143,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
             RedeemRequestInfo({controller: _controller, sharesAmount: _shares, canCancelTime: canCancelTime});
 
         // Take shares from owner
-        IERC20(__getShares()).safeTransferFrom(_owner, address(this), _shares);
+        Shares(__getShares()).authTransferFrom(_owner, address(this), _shares);
 
         // Required event for ERC7540Like
         emit RedeemRequest({

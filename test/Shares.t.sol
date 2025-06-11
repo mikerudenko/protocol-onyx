@@ -16,9 +16,10 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {ISharesTransferValidator} from "src/interfaces/ISharesTransferValidator.sol";
 import {Shares} from "src/shares/Shares.sol";
 
-import {BlankFeeHandler} from "test/mocks/Blanks.sol";
+import {BlankFeeHandler, BlankSharesTransferValidator} from "test/mocks/Blanks.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
 
@@ -418,6 +419,28 @@ contract SharesTest is Test, TestHelpers {
         assertEq(shares.getFeeHandler(), newFeeHandler);
     }
 
+    function test_setSharesTransferValidator_fail_unauthorized() public {
+        address randomUser = makeAddr("randomUser");
+        address newSharesTransferValidator = makeAddr("newSharesTransferValidator");
+
+        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
+
+        vm.prank(randomUser);
+        shares.setSharesTransferValidator(newSharesTransferValidator);
+    }
+
+    function test_setSharesTransferValidator_success() public {
+        address newSharesTransferValidator = makeAddr("newSharesTransferValidator");
+
+        vm.expectEmit(address(shares));
+        emit Shares.SharesTransferValidatorSet(newSharesTransferValidator);
+
+        vm.prank(admin);
+        shares.setSharesTransferValidator(newSharesTransferValidator);
+
+        assertEq(shares.getSharesTransferValidator(), newSharesTransferValidator);
+    }
+
     function test_setValuationHandler_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
         address newValuationHandler = makeAddr("newValuationHandler");
@@ -438,99 +461,6 @@ contract SharesTest is Test, TestHelpers {
         shares.setValuationHandler(newValuationHandler);
 
         assertEq(shares.getValuationHandler(), newValuationHandler);
-    }
-
-    // SHARES HOLDING
-
-    function test_addAllowedHolder_fail_alreadyAdded() public {
-        address newHolder = makeAddr("newHolder");
-
-        vm.prank(admin);
-        shares.addAllowedHolder(newHolder);
-
-        // Second call should fail
-        vm.expectRevert(Shares.Shares__AddAllowedHolder__AlreadyAdded.selector);
-        vm.prank(admin);
-        shares.addAllowedHolder(newHolder);
-    }
-
-    function test_addAllowedHolder_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-        address newAllowedHolder = makeAddr("newAllowedHolder");
-
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.addAllowedHolder(newAllowedHolder);
-    }
-
-    function test_addAllowedHolder_success() public {
-        address newHolder = makeAddr("newHolder");
-
-        vm.expectEmit(address(shares));
-        emit Shares.AllowedHolderAdded(newHolder);
-
-        vm.prank(admin);
-        shares.addAllowedHolder(newHolder);
-
-        assertTrue(shares.isAllowedHolder(newHolder));
-    }
-
-    function test_removeAllowedHolder_fail_alreadyRemoved() public {
-        address newHolder = makeAddr("newHolder");
-
-        vm.expectRevert(Shares.Shares__RemoveAllowedHolder__AlreadyRemoved.selector);
-        vm.prank(admin);
-        shares.removeAllowedHolder(newHolder);
-    }
-
-    function test_removeAllowedHolder_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-        address newAllowedHolder = makeAddr("newAllowedHolder");
-
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.removeAllowedHolder(newAllowedHolder);
-    }
-
-    function test_removeAllowedHolder_success() public {
-        address newHolder = makeAddr("newHolder");
-
-        vm.prank(admin);
-        shares.addAllowedHolder(newHolder);
-
-        vm.expectEmit(address(shares));
-        emit Shares.AllowedHolderRemoved(newHolder);
-
-        vm.prank(admin);
-        shares.removeAllowedHolder(newHolder);
-
-        assertFalse(shares.isAllowedHolder(newHolder));
-    }
-
-    function test_setHolderRestriction_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-        Shares.HolderRestriction newRestriction = Shares.HolderRestriction.RestrictedWithTransfers;
-
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.setHolderRestriction(newRestriction);
-    }
-
-    function test_setHolderRestriction_success() public {
-        // Use non-zero value (i.e., not "None")
-        Shares.HolderRestriction newRestriction = Shares.HolderRestriction.RestrictedWithTransfers;
-        assertNotEq(uint8(shares.getHolderRestriction()), uint8(newRestriction));
-
-        vm.expectEmit(address(shares));
-        emit Shares.HolderRestrictionSet(newRestriction);
-
-        vm.prank(admin);
-        shares.setHolderRestriction(newRestriction);
-
-        assertEq(uint8(shares.getHolderRestriction()), uint8(newRestriction));
     }
 
     //==================================================================================================================
@@ -583,126 +513,56 @@ contract SharesTest is Test, TestHelpers {
     // Transfer
     //==================================================================================================================
 
-    enum TestTransferRecipientType {
-        Random,
-        HolderAllowlist,
-        RedeemHandler
+    function test_transfer_success_noValidator() public {
+        __test_transfer_success({_hasValidator: false, _transferFrom: false});
     }
 
-    function test_transferRules_success_unrestricted() public {
-        __test_transferRules({
-            _holderRestriction: Shares.HolderRestriction.None,
-            _recipientType: TestTransferRecipientType.Random,
-            _expectSuccess: true
-        });
+    function test_transfer_success_withValidator() public {
+        __test_transfer_success({_hasValidator: true, _transferFrom: false});
     }
 
-    function test_transferRules_fail_restrictedWithTransfers_randomUser() public {
-        __test_transferRules({
-            _holderRestriction: Shares.HolderRestriction.RestrictedWithTransfers,
-            _recipientType: TestTransferRecipientType.Random,
-            _expectSuccess: false
-        });
+    function test_transferFrom_success_noValidator() public {
+        __test_transfer_success({_hasValidator: false, _transferFrom: true});
     }
 
-    function test_transferRules_success_restrictedWithTransfers_holderAllowlist() public {
-        __test_transferRules({
-            _holderRestriction: Shares.HolderRestriction.RestrictedWithTransfers,
-            _recipientType: TestTransferRecipientType.HolderAllowlist,
-            _expectSuccess: true
-        });
+    function test_transferFrom_success_withValidator() public {
+        __test_transfer_success({_hasValidator: true, _transferFrom: true});
     }
 
-    function test_transferRules_success_restrictedWithTransfers_redeemHandler() public {
-        __test_transferRules({
-            _holderRestriction: Shares.HolderRestriction.RestrictedWithTransfers,
-            _recipientType: TestTransferRecipientType.RedeemHandler,
-            _expectSuccess: true
-        });
-    }
-
-    function test_transferRules_fail_restrictedNoTransfers_randomUser() public {
-        __test_transferRules({
-            _holderRestriction: Shares.HolderRestriction.RestrictedNoTransfers,
-            _recipientType: TestTransferRecipientType.Random,
-            _expectSuccess: false
-        });
-    }
-
-    function test_transferRules_fail_restrictedNoTransfers_holderAllowlist() public {
-        __test_transferRules({
-            _holderRestriction: Shares.HolderRestriction.RestrictedNoTransfers,
-            _recipientType: TestTransferRecipientType.HolderAllowlist,
-            _expectSuccess: false
-        });
-    }
-
-    function test_transferRules_success_restrictedNoTransfers_redeemHandler() public {
-        __test_transferRules({
-            _holderRestriction: Shares.HolderRestriction.RestrictedNoTransfers,
-            _recipientType: TestTransferRecipientType.RedeemHandler,
-            _expectSuccess: true
-        });
-    }
-
-    function __test_transferRules(
-        Shares.HolderRestriction _holderRestriction,
-        TestTransferRecipientType _recipientType,
-        bool _expectSuccess
-    ) internal {
+    function __test_transfer_success(bool _hasValidator, bool _transferFrom) internal {
         address from = makeAddr("__test_transfer:from");
         address to = makeAddr("__test_transfer:to");
 
-        // Give recipient necessary role
-        if (_recipientType == TestTransferRecipientType.HolderAllowlist) {
-            // Add to holder allowlist
-            vm.prank(owner);
-            shares.addAllowedHolder(to);
-        } else if (_recipientType == TestTransferRecipientType.RedeemHandler) {
-            // Add as redeem handler
-            vm.prank(owner);
-            shares.addRedeemHandler(to);
-        }
-
-        // Set specified HolderRestriction
-        vm.prank(owner);
-        shares.setHolderRestriction(_holderRestriction);
-
-        // Assert getter
-        assertEq(shares.isAllowedTransferRecipient(to), _expectSuccess);
-
-        // Test both transfer() and transferFrom() functions
-        __test_transferRules_assertTransfer({_from: from, _to: to, _expectSuccess: _expectSuccess, _transferFrom: false});
-        __test_transferRules_assertTransfer({_from: from, _to: to, _expectSuccess: _expectSuccess, _transferFrom: true});
-    }
-
-    function __test_transferRules_assertTransfer(address _from, address _to, bool _expectSuccess, bool _transferFrom)
-        internal
-    {
-        // Give _from shares balance to transfer
+        // Give from shares balance to transfer
         uint256 amount = 100;
-        deal({token: address(shares), to: _from, give: amount, adjust: true});
+        deal({token: address(shares), to: from, give: amount, adjust: true});
 
-        // Grant approval to test contract to call transferFrom()
-        vm.prank(_from);
-        shares.approve(address(this), amount);
+        // Set an arbitrary transfer validator that will always pass
+        if (_hasValidator) {
+            address transferValidator = address(new BlankSharesTransferValidator());
+            vm.prank(owner);
+            shares.setSharesTransferValidator(transferValidator);
 
-        uint256 prevRecipientBalance = shares.balanceOf(_to);
-
-        if (!_expectSuccess) {
-            vm.expectRevert(Shares.Shares__ValidateTransferRecipient__NotAllowed.selector);
+            // Pre-assert expected call
+            vm.expectCall({
+                callee: transferValidator,
+                data: abi.encodeWithSelector(ISharesTransferValidator.validateSharesTransfer.selector, from, to, amount)
+            });
         }
 
         if (_transferFrom) {
-            shares.transferFrom(_from, _to, amount);
+            // Grant approval to test contract to call transferFrom()
+            vm.prank(from);
+            shares.approve(address(this), amount);
+
+            shares.transferFrom(from, to, amount);
         } else {
-            vm.prank(_from);
-            shares.transfer(_to, amount);
+            vm.prank(from);
+            shares.transfer(to, amount);
         }
 
-        if (_expectSuccess) {
-            assertEq(shares.balanceOf(_to), prevRecipientBalance + amount);
-        }
+        assertEq(shares.balanceOf(from), 0);
+        assertEq(shares.balanceOf(to), amount);
     }
 
     // NO RULES
@@ -746,9 +606,10 @@ contract SharesTest is Test, TestHelpers {
         deal({token: address(shares), to: _from, give: fromBalance, adjust: true});
         deal({token: address(shares), to: to, give: toBalance, adjust: true});
 
-        // Use strictest holder restriction
+        // Set an arbitrary transfer validator, so that normal transfers would fail
+        address transferValidator = makeAddr("transferValidator");
         vm.prank(owner);
-        shares.setHolderRestriction(Shares.HolderRestriction.RestrictedNoTransfers);
+        shares.setSharesTransferValidator(transferValidator);
 
         // Auth transfer `_from` => `to`
         vm.prank(_from);
@@ -758,19 +619,19 @@ contract SharesTest is Test, TestHelpers {
         assertEq(shares.balanceOf(to), toBalance + transferAmount);
     }
 
-    function test_forceTransferFrom_fail_unauthorized() public {
-        address randomUser = makeAddr("forceTransferFrom:randomUser");
+    function test_authTransferFrom_fail_unauthorized() public {
+        address randomUser = makeAddr("authTransferFrom:randomUser");
 
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
+        vm.expectRevert(Shares.Shares__OnlyRedeemHandler__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shares.forceTransferFrom({_from: address(0), _to: address(0), _amount: 0});
+        shares.authTransferFrom({_from: address(0), _to: address(0), _amount: 0});
     }
 
     /// @dev Should not be subject to transfer rules
-    function test_forceTransferFrom_success() public {
-        address from = makeAddr("forceTransfer:from");
-        address to = makeAddr("forceTransfer:to");
+    function test_authTransferFrom_success() public {
+        address from = makeAddr("authTransfer:from");
+        address to = makeAddr("authTransfer:to");
 
         uint256 fromBalance = 100;
         uint256 toBalance = 70;
@@ -779,86 +640,22 @@ contract SharesTest is Test, TestHelpers {
         deal({token: address(shares), to: from, give: fromBalance, adjust: true});
         deal({token: address(shares), to: to, give: toBalance, adjust: true});
 
-        // Use strictest holder restriction
+        // Set an arbitrary transfer validator, so that normal transfers would fail
+        address transferValidator = makeAddr("transferValidator");
         vm.prank(owner);
-        shares.setHolderRestriction(Shares.HolderRestriction.RestrictedNoTransfers);
+        shares.setSharesTransferValidator(transferValidator);
 
+        // Set a redeem handler to be the caller
+        address redeemHandler = makeAddr("redeemHandler");
         vm.prank(owner);
-        shares.forceTransferFrom({_from: from, _to: to, _amount: transferAmount});
+        shares.addRedeemHandler(redeemHandler);
+
+        // Transfer
+        vm.prank(redeemHandler);
+        shares.authTransferFrom({_from: from, _to: to, _amount: transferAmount});
 
         assertEq(shares.balanceOf(from), fromBalance - transferAmount);
         assertEq(shares.balanceOf(to), toBalance + transferAmount);
-    }
-
-    //==================================================================================================================
-    // Depositor rules
-    //==================================================================================================================
-
-    enum TestDepositRecipientType {
-        Random,
-        HolderAllowlist
-    }
-
-    function test_isAllowedDepositRecipient_success_unrestricted() public {
-        __test_isAllowedDepositRecipient({
-            _holderRestriction: Shares.HolderRestriction.None,
-            _recipientType: TestDepositRecipientType.Random,
-            _expectSuccess: true
-        });
-    }
-
-    function test_isAllowedDepositRecipient_fail_restrictedWithTransfers_randomUser() public {
-        __test_isAllowedDepositRecipient({
-            _holderRestriction: Shares.HolderRestriction.RestrictedWithTransfers,
-            _recipientType: TestDepositRecipientType.Random,
-            _expectSuccess: false
-        });
-    }
-
-    function test_isAllowedDepositRecipient_success_restrictedWithTransfers_holderAllowlist() public {
-        __test_isAllowedDepositRecipient({
-            _holderRestriction: Shares.HolderRestriction.RestrictedWithTransfers,
-            _recipientType: TestDepositRecipientType.HolderAllowlist,
-            _expectSuccess: true
-        });
-    }
-
-    function test_isAllowedDepositRecipient_fail_restrictedNoTransfers_randomUser() public {
-        __test_isAllowedDepositRecipient({
-            _holderRestriction: Shares.HolderRestriction.RestrictedNoTransfers,
-            _recipientType: TestDepositRecipientType.Random,
-            _expectSuccess: false
-        });
-    }
-
-    function test_isAllowedDepositRecipient_success_restrictedNoTransfers_holderAllowlist() public {
-        __test_isAllowedDepositRecipient({
-            _holderRestriction: Shares.HolderRestriction.RestrictedNoTransfers,
-            _recipientType: TestDepositRecipientType.HolderAllowlist,
-            _expectSuccess: true
-        });
-    }
-
-    function __test_isAllowedDepositRecipient(
-        Shares.HolderRestriction _holderRestriction,
-        TestDepositRecipientType _recipientType,
-        bool _expectSuccess
-    ) internal {
-        address to = makeAddr("__test_isAllowedDepositRecipient:to");
-
-        // Give recipient necessary role
-        if (_recipientType == TestDepositRecipientType.HolderAllowlist) {
-            // Add to holder allowlist
-            vm.prank(owner);
-            shares.addAllowedHolder(to);
-        }
-
-        // Set specified HolderRestriction
-        vm.prank(owner);
-        shares.setHolderRestriction(_holderRestriction);
-
-        // Assert getter
-        assertEq(shares.isAllowedDepositRecipient(to), _expectSuccess);
     }
 
     //==================================================================================================================

@@ -16,6 +16,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {ISharesTransferValidator} from "src/interfaces/ISharesTransferValidator.sol";
 import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 
@@ -31,22 +32,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
 
     //==================================================================================================================
-    // Types
-    //==================================================================================================================
-
-    /// @dev Options for restricting allowed recipients of deposits and transfers of shares
-    /// `None`: deposits and transfers are not restricted
-    /// `RestrictedNoTransfers`: deposits are restricted to the allowed holders list, no transfers are allowed
-    /// `RestrictedWithTransfers`: deposits and transfers are restricted to the allowed holders list
-    /// Transfers are restricted at the ERC20 level, i.e., validated during transfer() and transferFrom().
-    /// Deposits are not restricted automatically, and must be restricted by deposit handlers.
-    enum HolderRestriction {
-        None,
-        RestrictedNoTransfers,
-        RestrictedWithTransfers
-    }
-
-    //==================================================================================================================
     // Storage
     //==================================================================================================================
 
@@ -55,28 +40,26 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     /// @custom:storage-location erc7201:enzyme.Shares
     /// @param valueAsset A representation of the asset of account in which core values are reported (e.g., USD)
     /// @param depositAssetsDest The account to which deposits are transferred
-    /// @param holderRestriction The restriction option for who can deposit and receive shares transfers
     /// @param redeemAssetsSrc The account from which assets are withdrawn to fulfill redemptions
     /// @param feeAssetsSrc The account from which assets are withdrawn to fulfill fee claims
     /// @param feeHandler The contract that handles fees (settlement, claims, accounting)
+    /// @param sharesTransferValidator A contract that supplies shares transfer validation
     /// @param valuationHandler The contract that handles valuation-related operations
     /// @param isDepositHandler True if the account is an allowed deposit handler
     /// @param isRedeemHandler True if the account is an allowed redeem handler
     /// @param isAdmin True if the account is an admin
-    /// @param isAllowedHolder True if the account is an allowed holder (used in tandem with holderRestriction)
     /// @dev `valueAsset` is not used within the system, but is stored on-chain in case needed by integrators.
     struct SharesStorage {
         bytes32 valueAsset;
         address depositAssetsDest;
-        HolderRestriction holderRestriction;
         address redeemAssetsSrc;
         address feeAssetsSrc;
         address feeHandler;
+        address sharesTransferValidator;
         address valuationHandler;
         mapping(address => bool) isDepositHandler;
         mapping(address => bool) isRedeemHandler;
         mapping(address => bool) isAdmin;
-        mapping(address => bool) isAllowedHolder;
     }
 
     function __getSharesStorage() private view returns (SharesStorage storage $) {
@@ -94,10 +77,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event AdminRemoved(address admin);
 
-    event AllowedHolderAdded(address holder);
-
-    event AllowedHolderRemoved(address holder);
-
     event DepositAssetsDestSet(address dest);
 
     event DepositHandlerAdded(address depositHandler);
@@ -108,13 +87,13 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event FeeHandlerSet(address feeHandler);
 
-    event HolderRestrictionSet(HolderRestriction holderRestriction);
-
     event RedeemAssetsSrcSet(address src);
 
     event RedeemHandlerAdded(address redeemHandler);
 
     event RedeemHandlerRemoved(address redeemHandler);
+
+    event SharesTransferValidatorSet(address validator);
 
     event ValuationHandlerSet(address valuationHandler);
 
@@ -215,37 +194,52 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     //==================================================================================================================
 
     /// @notice Standard ERC20 transfer of shares
-    /// @dev ERC20 override: validate recipient
     function transfer(address _to, uint256 _amount) public override returns (bool) {
-        __validateTransferRecipient({_who: _to});
+        __validateSharesTransfer({_from: msg.sender, _to: _to, _amount: _amount});
 
         return super.transfer(_to, _amount);
     }
 
     /// @notice Standard ERC20 transferFrom of shares
-    /// @dev ERC20 override: validate recipient
     function transferFrom(address _from, address _to, uint256 _amount) public override returns (bool) {
-        __validateTransferRecipient({_who: _to});
+        __validateSharesTransfer({_from: _from, _to: _to, _amount: _amount});
 
         return super.transferFrom(_from, _to, _amount);
+    }
+
+    function __validateSharesTransfer(address _from, address _to, uint256 _amount) internal {
+        address sharesTransferValidator = getSharesTransferValidator();
+
+        if (sharesTransferValidator != address(0)) {
+            ISharesTransferValidator(sharesTransferValidator).validateSharesTransfer({
+                _from: _from,
+                _to: _to,
+                _amount: _amount
+            });
+        }
     }
 
     //==================================================================================================================
     // ERC20-like extensions (access: mixed)
     //==================================================================================================================
 
-    /// @notice Unvalidated transfer of shares from trusted handlers.
+    /// @notice Unvalidated transfer() for trusted handlers.
     /// @dev Any validation of the recipient must be done by the calling contract.
+    /// Needed for, e.g.,:
+    /// - Shares distribution from async deposit handler
+    /// - Redeem request cancellation from async redeem handler
     function authTransfer(address _to, uint256 _amount) external {
         require(isDepositHandler(msg.sender) || isRedeemHandler(msg.sender), Shares__AuthTransfer__Unauthorized());
 
         _transfer(msg.sender, _to, _amount);
     }
 
-    /// @notice Forces transfer of shares
-    /// @dev Sometimes a compliance requirement, and simpler than using both deposit+redeem handler permissions.
-    /// Not subject to transfer rules.
-    function forceTransferFrom(address _from, address _to, uint256 _amount) external onlyAdminOrOwner {
+    /// @notice Unvalidated transferFrom() for trusted handlers.
+    /// @dev Any validation of the recipient must be done by the calling contract.
+    /// Needed for, e.g.,:
+    /// - Approval-less redemption from async redeem handler
+    /// - Forced transfers via redeem handler (sometimes a compliance requirement)
+    function authTransferFrom(address _from, address _to, uint256 _amount) external onlyRedeemHandler {
         _transfer(_from, _to, _amount);
     }
 
@@ -343,38 +337,19 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         emit FeeHandlerSet(_feeHandler);
     }
 
+    /// @dev Can set to any non-existent, arbitrary address to make Shares non-transferrable
+    function setSharesTransferValidator(address _sharesTransferValidator) external onlyAdminOrOwner {
+        SharesStorage storage $ = __getSharesStorage();
+        $.sharesTransferValidator = _sharesTransferValidator;
+
+        emit SharesTransferValidatorSet(_sharesTransferValidator);
+    }
+
     function setValuationHandler(address _valuationHandler) external onlyAdminOrOwner {
         SharesStorage storage $ = __getSharesStorage();
         $.valuationHandler = _valuationHandler;
 
         emit ValuationHandlerSet(_valuationHandler);
-    }
-
-    // SHARES HOLDING
-
-    function addAllowedHolder(address _holder) external onlyAdminOrOwner {
-        require(!isAllowedHolder(_holder), Shares__AddAllowedHolder__AlreadyAdded());
-
-        SharesStorage storage $ = __getSharesStorage();
-        $.isAllowedHolder[_holder] = true;
-
-        emit AllowedHolderAdded(_holder);
-    }
-
-    function removeAllowedHolder(address _holder) external onlyAdminOrOwner {
-        require(isAllowedHolder(_holder), Shares__RemoveAllowedHolder__AlreadyRemoved());
-
-        SharesStorage storage $ = __getSharesStorage();
-        $.isAllowedHolder[_holder] = false;
-
-        emit AllowedHolderRemoved(_holder);
-    }
-
-    function setHolderRestriction(HolderRestriction _holderRestriction) external onlyAdminOrOwner {
-        SharesStorage storage $ = __getSharesStorage();
-        $.holderRestriction = _holderRestriction;
-
-        emit HolderRestrictionSet(_holderRestriction);
     }
 
     // HELPERS
@@ -412,9 +387,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // Shares issuance and asset transfers
     //==================================================================================================================
 
-    /// @dev Any shares flows within deposit and redeem handlers must be validated within those individual contracts,
-    /// e.g., with calls to isAllowedDepositRecipient() or isAllowedTransferRecipient()
-
     /// @dev No general burn() function is exposed, in order to guarantee constant supply during share value updates
 
     // DEPOSIT FLOW
@@ -441,30 +413,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     /// @dev Callable by: FeeHandler
     function withdrawFeeAssetTo(address _asset, address _to, uint256 _amount) external onlyFeeHandler {
         IERC20(_asset).safeTransferFrom(getFeeAssetsSrc(), _to, _amount);
-    }
-
-    // ALLOWED DEPOSIT AND TRANSFER RECIPIENTS
-
-    /// @notice Returns whether an account is allowed to receive shares from a deposit
-    /// @dev Allowed if:
-    /// A. holders are unrestricted
-    /// B. user has been added as an allowed holder
-    function isAllowedDepositRecipient(address _who) public view returns (bool) {
-        return getHolderRestriction() == HolderRestriction.None || isAllowedHolder(_who);
-    }
-
-    /// @notice Returns whether an account is allowed to receive shares from a transfer
-    /// @dev Allowed if:
-    /// A. holders are unrestricted
-    /// B. recipient is an authorized redeem handler (i.e., for async shares requests)
-    /// C. transfer between allowed holders is permitted + recipient is an allowed holder
-    function isAllowedTransferRecipient(address _who) public view returns (bool) {
-        return getHolderRestriction() == HolderRestriction.None || isRedeemHandler(_who)
-            || (getHolderRestriction() == HolderRestriction.RestrictedWithTransfers && isAllowedHolder(_who));
-    }
-
-    function __validateTransferRecipient(address _who) internal view {
-        require(isAllowedTransferRecipient(_who), Shares__ValidateTransferRecipient__NotAllowed());
     }
 
     //==================================================================================================================
@@ -499,14 +447,14 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         return __getSharesStorage().feeHandler;
     }
 
-    /// @notice Returns the holder restriction option
-    function getHolderRestriction() public view returns (HolderRestriction) {
-        return __getSharesStorage().holderRestriction;
-    }
-
     /// @notice Returns the source for assets used for redemptions
     function getRedeemAssetsSrc() public view returns (address) {
         return __getSharesStorage().redeemAssetsSrc;
+    }
+
+    /// @notice Returns the contract that validates shares transfers
+    function getSharesTransferValidator() public view returns (address) {
+        return __getSharesStorage().sharesTransferValidator;
     }
 
     /// @notice Returns the contract the handles valuation logic
@@ -522,11 +470,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     /// @notice Returns whether an account has an "admin" role
     function isAdmin(address _who) public view returns (bool) {
         return __getSharesStorage().isAdmin[_who];
-    }
-
-    /// @notice Returns whether an account is on the "allowed holders" list
-    function isAllowedHolder(address _who) public view returns (bool) {
-        return __getSharesStorage().isAllowedHolder[_who];
     }
 
     /// @notice Returns whether an account is an allowed deposit handler

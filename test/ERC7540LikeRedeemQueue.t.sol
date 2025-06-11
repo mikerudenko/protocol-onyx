@@ -111,11 +111,6 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
     }
 
     function __test_cancelRedeem_setup() internal returns (uint256 requestId_) {
-        // Set shares to use a strict depositor allowlist with no transfers.
-        // This is important to ensure that the controller can always receive a shares refund.
-        vm.prank(admin);
-        shares.setHolderRestriction(Shares.HolderRestriction.RestrictedNoTransfers);
-
         // Define a controller, and seed it with shares, and grant allowance to the redeem queue
         address controller = makeAddr("controller");
         deal(address(shares), controller, 1000 * 10 ** shares.decimals(), true);
@@ -231,10 +226,6 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
     }
 
     function __test_requestRedeem_setup(address _sharesOwner) internal {
-        // Set shares to use a strict depositor allowlist with no transfers
-        vm.prank(admin);
-        shares.setHolderRestriction(Shares.HolderRestriction.RestrictedNoTransfers);
-
         // Seed shares owner with shares, and grant allowance to the queue
         deal(address(shares), _sharesOwner, 1000 * 10 ** shares.decimals(), true);
         vm.prank(_sharesOwner);

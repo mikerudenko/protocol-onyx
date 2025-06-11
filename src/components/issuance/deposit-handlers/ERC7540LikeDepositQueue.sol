@@ -35,6 +35,14 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     // Types
     //==================================================================================================================
 
+    /// @dev Options for restricting deposits
+    /// `None`: No restrictions
+    /// `ControllerAllowlist`: Only addresses in this contract's allowlist can be a request `controller`
+    enum DepositRestriction {
+        None,
+        ControllerAllowlist
+    }
+
     /// @param controller The user who owns the request
     /// @param canCancelTime The time when the request can be canceled
     /// @param assetAmount The amount of the asset to deposit
@@ -57,7 +65,9 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     struct DepositQueueStorage {
         uint128 lastId;
         uint24 minRequestDuration;
+        DepositRestriction depositRestriction;
         mapping(uint256 => DepositRequestInfo) idToRequest;
+        mapping(address => bool) isAllowedController;
     }
 
     function __getDepositQueueStorage() private view returns (DepositQueueStorage storage $) {
@@ -71,7 +81,13 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     // Events
     //==================================================================================================================
 
+    event AllowedControllerAdded(address controller);
+
+    event AllowedControllerRemoved(address controller);
+
     event DepositMinRequestDurationSet(uint24 minRequestDuration);
+
+    event DepositRestrictionSet(DepositRestriction restriction);
 
     //==================================================================================================================
     // Errors
@@ -83,7 +99,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
 
     error ERC7540LikeDepositQueue__ExecuteDepositRequests__ZeroShares();
 
-    error ERC7540LikeDepositQueue__RequestDeposit__ControllerNotAllowedDepositor();
+    error ERC7540LikeDepositQueue__RequestDeposit__ControllerNotAllowed();
 
     error ERC7540LikeDepositQueue__RequestDeposit__OwnerNotController();
 
@@ -94,6 +110,24 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     //==================================================================================================================
     // Config (access: admin or owner)
     //==================================================================================================================
+
+    function addAllowedController(address _controller) external onlyAdminOrOwner {
+        __getDepositQueueStorage().isAllowedController[_controller] = true;
+
+        emit AllowedControllerAdded({controller: _controller});
+    }
+
+    function removeAllowedController(address _controller) external onlyAdminOrOwner {
+        __getDepositQueueStorage().isAllowedController[_controller] = false;
+
+        emit AllowedControllerRemoved({controller: _controller});
+    }
+
+    function setDepositRestriction(DepositRestriction _restriction) external onlyAdminOrOwner {
+        __getDepositQueueStorage().depositRestriction = _restriction;
+
+        emit DepositRestrictionSet({restriction: _restriction});
+    }
 
     function setDepositMinRequestDuration(uint24 _minRequestDuration) external onlyAdminOrOwner {
         __getDepositQueueStorage().minRequestDuration = _minRequestDuration;
@@ -150,9 +184,10 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
         require(_assets > 0, ERC7540LikeDepositQueue__RequestDeposit__ZeroAssets());
         require(_owner == msg.sender, ERC7540LikeDepositQueue__RequestDeposit__OwnerNotSender());
         require(_owner == _controller, ERC7540LikeDepositQueue__RequestDeposit__OwnerNotController());
+
         require(
-            Shares(__getShares()).isAllowedDepositRecipient({_who: _controller}),
-            ERC7540LikeDepositQueue__RequestDeposit__ControllerNotAllowedDepositor()
+            getDepositRestriction() == DepositRestriction.None || isInAllowedControllerList(_controller),
+            ERC7540LikeDepositQueue__RequestDeposit__ControllerNotAllowed()
         );
 
         uint40 canCancelTime = uint40(block.timestamp + getDepositMinRequestDuration());
@@ -263,5 +298,15 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     /// @return request_ The request
     function getDepositRequest(uint256 _requestId) public view returns (DepositRequestInfo memory request_) {
         return __getDepositQueueStorage().idToRequest[_requestId];
+    }
+
+    /// @notice Returns the active deposit restriction option
+    function getDepositRestriction() public view returns (DepositRestriction restriction_) {
+        return __getDepositQueueStorage().depositRestriction;
+    }
+
+    /// @notice Returns true if the account is in the allowed controllers list
+    function isInAllowedControllerList(address _who) public view returns (bool) {
+        return __getDepositQueueStorage().isAllowedController[_who];
     }
 }

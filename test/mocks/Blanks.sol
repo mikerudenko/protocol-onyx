@@ -18,6 +18,7 @@ import {IManagementFeeTracker} from "src/components/fees/interfaces/IManagementF
 import {IPerformanceFeeTracker} from "src/components/fees/interfaces/IPerformanceFeeTracker.sol";
 import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
+import {ISharesTransferValidator} from "src/interfaces/ISharesTransferValidator.sol";
 
 contract BlankFeeHandler is IFeeHandler {
     function getTotalValueOwed() external view returns (uint256 totalValueOwed_) {}
@@ -39,4 +40,8 @@ contract BlankPerformanceFeeTracker is IPerformanceFeeTracker {
 
 contract BlankPositionTracker is IPositionTracker {
     function getPositionValue() external view returns (int256 value_) {}
+}
+
+contract BlankSharesTransferValidator is ISharesTransferValidator {
+    function validateSharesTransfer(address _from, address _to, uint256 _amount) external {}
 }
