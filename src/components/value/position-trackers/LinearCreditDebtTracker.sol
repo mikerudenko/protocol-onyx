@@ -69,7 +69,7 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     // Events
     //==================================================================================================================
 
-    event ItemAdded(uint24 id, int128 totalValue, uint40 start, uint32 duration);
+    event ItemAdded(uint24 id, int128 totalValue, uint40 start, uint32 duration, string description);
 
     event ItemRemoved(uint24 id);
 
@@ -93,9 +93,10 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     /// @param _totalValue The total value of the item (quoted in the Shares value asset), written down linearly over time
     /// @param _start The start timestamp of the linear write-down period
     /// @param _duration The duration of the linear write-down period (in seconds)
+    /// @param _description A description of the item
     /// @return id_ The id of the new line-item
     /// @dev A _duration of 0 indicates a discrete value change at the _start timestamp
-    function addItem(int128 _totalValue, uint40 _start, uint32 _duration)
+    function addItem(int128 _totalValue, uint40 _start, uint32 _duration, string calldata _description)
         external
         onlyAdminOrOwner
         returns (uint24 id_)
@@ -110,7 +111,7 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
         $.idToItem[id_] =
             Item({totalValue: _totalValue, settledValue: 0, id: id_, index: index, start: _start, duration: _duration});
 
-        emit ItemAdded({id: id_, totalValue: _totalValue, start: _start, duration: _duration});
+        emit ItemAdded({id: id_, totalValue: _totalValue, start: _start, duration: _duration, description: _description});
     }
 
     /// @notice Removes an existing line-item from the tracker

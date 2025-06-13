@@ -47,7 +47,7 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
         vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
         vm.prank(randomUser);
-        tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
+        tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
     }
 
     function test_addItem_fail_emptyTotalValue() public {
@@ -56,7 +56,7 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
         );
 
         vm.prank(admin);
-        tracker.addItem({_totalValue: 0, _start: 123, _duration: 456});
+        tracker.addItem({_totalValue: 0, _start: 123, _duration: 456, _description: "test"});
     }
 
     function test_addItem_success() public {
@@ -71,17 +71,19 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
         uint24[] memory prevItemIds = tracker.getItemIds();
         uint256 prevItemsCount = prevItemIds.length;
         uint256 expectedIndex = prevItemsCount;
+        string memory description = "test";
 
         vm.expectEmit();
         emit LinearCreditDebtTracker.ItemAdded({
             id: expectedId,
             totalValue: _totalValue,
             start: _start,
-            duration: _duration
+            duration: _duration,
+            description: description
         });
 
         vm.prank(admin);
-        tracker.addItem({_totalValue: _totalValue, _start: _start, _duration: _duration});
+        tracker.addItem({_totalValue: _totalValue, _start: _start, _duration: _duration, _description: description});
 
         assertEq(tracker.getLastItemId(), expectedId);
         assertEq(tracker.getItemsCount(), prevItemsCount + 1);
@@ -106,7 +108,7 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
     function test_removeItem_success_oneItem() public {
         // Add one item
         vm.prank(admin);
-        uint24 id = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
+        uint24 id = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
 
         assertEq(tracker.getItemsCount(), 1);
 
@@ -124,9 +126,9 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
     function test_removeItem_success_firstItem() public {
         // Add a few items
         vm.startPrank(admin);
-        uint24 firstId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
-        uint24 middleId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
-        uint24 lastId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
+        uint24 firstId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
+        uint24 middleId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
+        uint24 lastId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
         vm.stopPrank();
 
         vm.expectEmit();
@@ -147,9 +149,9 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
     function test_removeItem_success_middleItem() public {
         // Add a few items
         vm.startPrank(admin);
-        uint24 firstId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
-        uint24 middleId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
-        uint24 lastId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
+        uint24 firstId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
+        uint24 middleId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
+        uint24 lastId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
         vm.stopPrank();
 
         vm.expectEmit();
@@ -170,9 +172,9 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
     function test_removeItem_success_lastItem() public {
         // Add a few items
         vm.startPrank(admin);
-        uint24 firstId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
-        uint24 middleId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
-        uint24 lastId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456});
+        uint24 firstId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
+        uint24 middleId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
+        uint24 lastId = tracker.addItem({_totalValue: 100, _start: 123, _duration: 456, _description: "test"});
         vm.stopPrank();
 
         vm.expectEmit();
@@ -205,9 +207,10 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
 
         // Add a few items
         vm.startPrank(admin);
-        tracker.addItem({_totalValue: totalValue, _start: start, _duration: duration});
-        uint24 middleId = tracker.addItem({_totalValue: totalValue, _start: start, _duration: duration});
-        tracker.addItem({_totalValue: totalValue, _start: start, _duration: duration});
+        tracker.addItem({_totalValue: totalValue, _start: start, _duration: duration, _description: "test"});
+        uint24 middleId =
+            tracker.addItem({_totalValue: totalValue, _start: start, _duration: duration, _description: "test"});
+        tracker.addItem({_totalValue: totalValue, _start: start, _duration: duration, _description: "test"});
         vm.stopPrank();
 
         vm.expectEmit();
@@ -257,15 +260,21 @@ contract LinearCreditDebtTrackerTest is Test, TestHelpers {
         uint24 futureItemId = tracker.addItem({
             _totalValue: futureItemTotalValue,
             _start: uint40(currentTime + 1),
-            _duration: uint32(1000)
+            _duration: uint32(1000),
+            _description: "test"
         });
         uint24 midwayItemId = tracker.addItem({
             _totalValue: midwayItemTotalValue,
             _start: uint40(currentTime - 10),
-            _duration: uint32(20)
+            _duration: uint32(20),
+            _description: "test"
         });
-        uint24 pastItemId =
-            tracker.addItem({_totalValue: pastItemTotalValue, _start: uint40(currentTime - 1000), _duration: 999});
+        uint24 pastItemId = tracker.addItem({
+            _totalValue: pastItemTotalValue,
+            _start: uint40(currentTime - 1000),
+            _duration: 999,
+            _description: "test"
+        });
         tracker.updateSettledValue({_id: futureItemId, _totalSettled: futureItemTotalSettled});
         tracker.updateSettledValue({_id: midwayItemId, _totalSettled: midwayItemTotalSettled});
         tracker.updateSettledValue({_id: pastItemId, _totalSettled: pastItemTotalSettled});
