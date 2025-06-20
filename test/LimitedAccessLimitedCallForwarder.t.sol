@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: GPL-3.0
+
+/*
+    This file is part of the Enzyme Protocol.
+
+    (c) Enzyme Foundation <foundation@enzyme.finance>
+
+    For the full license information, please view the LICENSE
+    file that was distributed with this source code.
+*/
+
+pragma solidity 0.8.28;
+
+import {LimitedAccessLimitedCallForwarder} from "src/components/roles/LimitedAccessLimitedCallForwarder.sol";
+import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
+import {Shares} from "src/shares/Shares.sol";
+
+import {LimitedAccessLimitedCallForwarderHarness} from "test/harnesses/LimitedAccessLimitedCallForwarderHarness.sol";
+import {TestHelpers} from "test/utils/TestHelpers.sol";
+
+contract LimitedAccessLimitedCallForwarderTest is TestHelpers {
+    Shares shares;
+    address owner;
+
+    LimitedAccessLimitedCallForwarderHarness callForwarder;
+    CallTarget callTarget;
+    bytes4 callSelector = CallTarget.foo.selector;
+    address authCaller = makeAddr("authCaller");
+
+    function setUp() public {
+        shares = createShares();
+        owner = shares.owner();
+
+        callForwarder = new LimitedAccessLimitedCallForwarderHarness({_shares: address(shares)});
+
+        callTarget = new CallTarget();
+    }
+
+    //==================================================================================================================
+    // Config (access: admin or owner)
+    //==================================================================================================================
+
+    function test_addUser_fail_alreadyRegistered() public {
+        vm.prank(owner);
+        callForwarder.addUser(authCaller);
+
+        vm.expectRevert(
+            LimitedAccessLimitedCallForwarder.LimitedAccessLimitedCallForwarder__AddUser__AlreadyAdded.selector
+        );
+
+        // fails upon adding the same call
+        vm.prank(owner);
+        callForwarder.addUser(authCaller);
+    }
+
+    function test_addUser_fail_unauthorized() public {
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        callForwarder.addUser(authCaller);
+    }
+
+    function test_addUser_success() public {
+        assertFalse(callForwarder.isUser(authCaller));
+
+        vm.expectEmit();
+        emit LimitedAccessLimitedCallForwarder.UserAdded(authCaller);
+
+        vm.prank(owner);
+        callForwarder.addUser(authCaller);
+
+        assertTrue(callForwarder.isUser(authCaller));
+    }
+
+    function test_removeUser_fail_notRegistered() public {
+        vm.expectRevert(
+            LimitedAccessLimitedCallForwarder.LimitedAccessLimitedCallForwarder__RemoveUser__NotAdded.selector
+        );
+
+        vm.prank(owner);
+        callForwarder.removeUser(authCaller);
+    }
+
+    function test_removeUser_fail_unauthorized() public {
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        callForwarder.removeUser(authCaller);
+    }
+
+    function test_removeUser_success() public {
+        vm.prank(owner);
+        callForwarder.addUser(authCaller);
+
+        assertTrue(callForwarder.isUser(authCaller));
+
+        vm.expectEmit();
+        emit LimitedAccessLimitedCallForwarder.UserRemoved(authCaller);
+
+        vm.prank(owner);
+        callForwarder.removeUser(authCaller);
+
+        assertFalse(callForwarder.isUser(authCaller));
+    }
+
+    //==================================================================================================================
+    // Calls
+    //==================================================================================================================
+
+    function test_executeCall_fail_unregisteredCall() public {
+        // register call
+        vm.prank(owner);
+        callForwarder.addCall({_target: address(callTarget), _selector: callSelector});
+
+        // do not register user
+
+        vm.expectRevert(
+            LimitedAccessLimitedCallForwarder.LimitedAccessLimitedCallForwarder__ExecuteCall__UnauthorizedUser.selector
+        );
+
+        callForwarder.executeCall({_target: address(callTarget), _data: abi.encodeWithSelector(CallTarget.foo.selector)});
+    }
+
+    function test_executeCall_success() public {
+        assertFalse(callTarget.called());
+
+        // register call
+        vm.prank(owner);
+        callForwarder.addCall({_target: address(callTarget), _selector: callSelector});
+
+        // register user
+        vm.prank(owner);
+        callForwarder.addUser(authCaller);
+
+        // call
+        vm.prank(authCaller);
+        callForwarder.executeCall({_target: address(callTarget), _data: abi.encodeWithSelector(CallTarget.foo.selector)});
+
+        assertTrue(callTarget.called());
+    }
+}
+
+contract CallTarget {
+    bool public called;
+
+    function foo() external {
+        called = true;
+    }
+}
