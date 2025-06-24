@@ -84,15 +84,10 @@ contract LimitedAccessLimitedCallForwarder is OpenAccessLimitedCallForwarder {
     // Calls
     //==================================================================================================================
 
-    function executeCall(address _target, bytes calldata _data)
-        public
-        payable
-        override
-        returns (bytes memory returnData_)
-    {
+    function executeCalls(Call[] calldata _calls) public payable override returns (bytes[] memory returnData_) {
         require(isUser(msg.sender), LimitedAccessLimitedCallForwarder__ExecuteCall__UnauthorizedUser());
 
-        return super.executeCall({_target: _target, _data: _data});
+        return super.executeCalls(_calls);
     }
 
     //==================================================================================================================

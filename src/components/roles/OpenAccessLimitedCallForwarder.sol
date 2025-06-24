@@ -21,6 +21,16 @@ import {StorageHelpersLib} from "src/utils/StorageHelpersLib.sol";
 /// @dev For use as an `admin` if wishing to open up specific protected actions to any caller
 contract OpenAccessLimitedCallForwarder is ComponentHelpersMixin {
     //==================================================================================================================
+    // Types
+    //==================================================================================================================
+
+    struct Call {
+        address target;
+        bytes data;
+        uint256 value;
+    }
+
+    //==================================================================================================================
     // Storage
     //==================================================================================================================
 
@@ -49,9 +59,9 @@ contract OpenAccessLimitedCallForwarder is ComponentHelpersMixin {
 
     event CallAdded(address target, bytes4 selector);
 
-    event CallRemoved(address target, bytes4 selector);
-
     event CallExecuted(address sender, address target, bytes data, uint256 value);
+
+    event CallRemoved(address target, bytes4 selector);
 
     //==================================================================================================================
     // Errors
@@ -91,10 +101,16 @@ contract OpenAccessLimitedCallForwarder is ComponentHelpersMixin {
     // Calls
     //==================================================================================================================
 
-    function executeCall(address _target, bytes calldata _data)
-        public
-        payable
-        virtual
+    /// @dev Does not validate that total calls value equals msg.value
+    function executeCalls(Call[] calldata _calls) public payable virtual returns (bytes[] memory returnData_) {
+        returnData_ = new bytes[](_calls.length);
+        for (uint256 i; i < _calls.length; i++) {
+            returnData_[i] = __executeCall({_target: _calls[i].target, _data: _calls[i].data, _value: _calls[i].value});
+        }
+    }
+
+    function __executeCall(address _target, bytes calldata _data, uint256 _value)
+        private
         returns (bytes memory returnData_)
     {
         require(
@@ -102,9 +118,9 @@ contract OpenAccessLimitedCallForwarder is ComponentHelpersMixin {
             OpenAccessLimitedCallForwarder__ExecuteCall__UnauthorizedCall()
         );
 
-        emit CallExecuted({sender: msg.sender, target: _target, data: _data, value: msg.value});
+        returnData_ = Address.functionCallWithValue({target: _target, data: _data, value: _value});
 
-        return Address.functionCallWithValue({target: _target, data: _data, value: msg.value});
+        emit CallExecuted({sender: msg.sender, target: _target, data: _data, value: _value});
     }
 
     //==================================================================================================================

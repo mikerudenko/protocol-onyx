@@ -12,6 +12,7 @@
 pragma solidity 0.8.28;
 
 import {LimitedAccessLimitedCallForwarder} from "src/components/roles/LimitedAccessLimitedCallForwarder.sol";
+import {OpenAccessLimitedCallForwarder} from "src/components/roles/OpenAccessLimitedCallForwarder.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {Shares} from "src/shares/Shares.sol";
 
@@ -105,21 +106,27 @@ contract LimitedAccessLimitedCallForwarderTest is TestHelpers {
     // Calls
     //==================================================================================================================
 
-    function test_executeCall_fail_unregisteredCall() public {
+    function test_executeCalls_fail_unregisteredUser() public {
         // register call
         vm.prank(owner);
         callForwarder.addCall({_target: address(callTarget), _selector: callSelector});
 
         // do not register user
+        OpenAccessLimitedCallForwarder.Call[] memory calls = new OpenAccessLimitedCallForwarder.Call[](1);
+        calls[0] = OpenAccessLimitedCallForwarder.Call({
+            target: address(callTarget),
+            data: abi.encodeWithSelector(CallTarget.foo.selector),
+            value: 0
+        });
 
         vm.expectRevert(
             LimitedAccessLimitedCallForwarder.LimitedAccessLimitedCallForwarder__ExecuteCall__UnauthorizedUser.selector
         );
 
-        callForwarder.executeCall({_target: address(callTarget), _data: abi.encodeWithSelector(CallTarget.foo.selector)});
+        callForwarder.executeCalls(calls);
     }
 
-    function test_executeCall_success() public {
+    function test_executeCalls_success() public {
         assertFalse(callTarget.called());
 
         // register call
@@ -130,11 +137,20 @@ contract LimitedAccessLimitedCallForwarderTest is TestHelpers {
         vm.prank(owner);
         callForwarder.addUser(authCaller);
 
+        // prepare calls
+        OpenAccessLimitedCallForwarder.Call[] memory calls = new OpenAccessLimitedCallForwarder.Call[](1);
+        calls[0] = OpenAccessLimitedCallForwarder.Call({
+            target: address(callTarget),
+            data: abi.encodeWithSelector(CallTarget.foo.selector),
+            value: 0
+        });
+
         // call
         vm.prank(authCaller);
-        callForwarder.executeCall({_target: address(callTarget), _data: abi.encodeWithSelector(CallTarget.foo.selector)});
+        bytes[] memory returnData = callForwarder.executeCalls(calls);
 
         assertTrue(callTarget.called());
+        assertEq(returnData.length, 1);
     }
 }
 
