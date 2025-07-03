@@ -216,11 +216,10 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
 
     function test_claimFees_fail_unauthorized() public {
         address owedUser = makeAddr("test_claimFees_fail_unauthorized:owedUser");
-        address randomUser = makeAddr("test_claimFees_fail_unauthorized:randomUser");
 
-        vm.expectRevert(FeeHandler.FeeHandler__ClaimFees__Unauthorized.selector);
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
 
-        vm.prank(randomUser);
+        vm.prank(owedUser);
         feeHandler.claimFees({_onBehalf: owedUser, _value: 123});
     }
 
@@ -247,19 +246,11 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
 
         vm.expectRevert(FeeHandler.FeeHandler__ClaimFees__ZeroFeeAsset.selector);
 
-        vm.prank(owedUser);
+        vm.prank(admin);
         feeHandler.claimFees({_onBehalf: owedUser, _value: 0});
     }
 
-    function test_claimFees_success_calledByAdmin() public {
-        __test_claimFees_success({_calledByAdmin: true});
-    }
-
-    function test_claimFees_success_calledByRecipient() public {
-        __test_claimFees_success({_calledByAdmin: false});
-    }
-
-    function __test_claimFees_success(bool _calledByAdmin) internal {
+    function test_claimFees_success() public {
         // Define all amount values
         uint256 valueDue = 500e18;
         uint256 valueToClaim = 100e18; // 100 value units
@@ -306,7 +297,6 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         vm.prank(feeAssetsSrc);
         mockFeeAsset.approve(address(shares), expectedFeeAssetAmount);
 
-        address caller = _calledByAdmin ? admin : feeRecipient;
         uint256 unclaimedValue = valueDue - valueToClaim;
 
         // Pre-assert events
@@ -318,7 +308,6 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
 
         vm.expectEmit();
         emit FeeHandler.FeesClaimed({
-            caller: caller,
             onBehalf: feeRecipient,
             value: valueToClaim,
             feeAsset: address(mockFeeAsset),
@@ -326,7 +315,7 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         });
 
         // Claim the fees
-        vm.prank(caller);
+        vm.prank(admin);
         uint256 feeAssetAmount = feeHandler.claimFees({_onBehalf: feeRecipient, _value: valueToClaim});
 
         // Check that the value was deducted from user and total fees owed

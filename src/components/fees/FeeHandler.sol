@@ -79,7 +79,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
 
     event FeeAssetSet(address asset);
 
-    event FeesClaimed(address caller, address onBehalf, uint256 value, address feeAsset, uint256 feeAssetAmount);
+    event FeesClaimed(address onBehalf, uint256 value, address feeAsset, uint256 feeAssetAmount);
 
     event ManagementFeeSet(address managementFeeTracker, address recipient);
 
@@ -96,8 +96,6 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     //==================================================================================================================
     // Errors
     //==================================================================================================================
-
-    error FeeHandler__ClaimFees__Unauthorized();
 
     error FeeHandler__ClaimFees__ZeroFeeAsset();
 
@@ -178,11 +176,10 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     /// @param _onBehalf The account for which to claim fees
     /// @param _value The value of fees owed to claim, in the Shares value asset (18-decimal precision)
     /// @return feeAssetAmount_ The amount of the fee asset transferred to _onBehalf
-    /// @dev Callable by: (1) owed user, or (2) admin.
+    /// @dev Only callable by admin, in order to give discretion on when fees are paid out.
     /// Fees are paid in the current fee asset set in this contract.
     /// Expects feeAssetAmount_ to be available in Shares' feeAssetsSrc
-    function claimFees(address _onBehalf, uint256 _value) external returns (uint256 feeAssetAmount_) {
-        require(msg.sender == _onBehalf || __isAdminOrOwner(msg.sender), FeeHandler__ClaimFees__Unauthorized());
+    function claimFees(address _onBehalf, uint256 _value) external onlyAdminOrOwner returns (uint256 feeAssetAmount_) {
         // `_value > owed` reverts in __updateValueOwed()
 
         Shares shares = Shares(__getShares());
@@ -196,13 +193,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
 
         shares.withdrawFeeAssetTo({_asset: feeAsset, _to: _onBehalf, _amount: feeAssetAmount_});
 
-        emit FeesClaimed({
-            caller: msg.sender,
-            onBehalf: _onBehalf,
-            value: _value,
-            feeAsset: feeAsset,
-            feeAssetAmount: feeAssetAmount_
-        });
+        emit FeesClaimed({onBehalf: _onBehalf, value: _value, feeAsset: feeAsset, feeAssetAmount: feeAssetAmount_});
     }
 
     //==================================================================================================================
