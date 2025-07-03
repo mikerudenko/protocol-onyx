@@ -184,18 +184,15 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
                 ? 0
                 : feeHandler.settleExitFeeGivenGrossShares({_grossSharesAmount: request.sharesAmount});
 
-            // Calculate net shares
-            uint256 netShares = request.sharesAmount - feeSharesAmount;
-
-            // Burn net shares held by this contract
-            shares.burnFor({_from: address(this), _sharesAmount: netShares});
-
-            // Calculate the asset amount due
+            // Calculate the asset amount due for remaining shares post-fee
             uint256 userAssets = ValueHelpersLib.calcValueOfSharesAmount({
                 _valuePerShare: sharePriceInRedeemAsset,
-                _sharesAmount: netShares
+                _sharesAmount: request.sharesAmount - feeSharesAmount
             });
             require(userAssets > 0, ERC7540LikeRedeemQueue__ExecuteRedeemRequests__ZeroAssets());
+
+            // Burn gross shares held by this contract
+            shares.burnFor({_from: address(this), _sharesAmount: request.sharesAmount});
 
             // Send asset to the user
             shares.withdrawRedeemAssetTo({_asset: asset(), _to: request.controller, _amount: userAssets});

@@ -57,6 +57,18 @@ contract TestHelpers is Test {
         vm.mockCall(_feeHandler, IFeeHandler.settleExitFeeGivenGrossShares.selector, abi.encode(_feeSharesAmount));
     }
 
+    function feeHandler_mockSettleExitFeeGivenGrossShares(
+        address _feeHandler,
+        uint256 _feeSharesAmount,
+        uint256 _grossSharesAmount
+    ) internal {
+        vm.mockCall(
+            _feeHandler,
+            abi.encodeWithSelector(IFeeHandler.settleExitFeeGivenGrossShares.selector, _grossSharesAmount),
+            abi.encode(_feeSharesAmount)
+        );
+    }
+
     function positionTracker_mockGetPositionValue(address _positionTracker, int256 _value) internal {
         vm.mockCall(_positionTracker, IPositionTracker.getPositionValue.selector, abi.encode(_value));
     }

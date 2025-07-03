@@ -262,12 +262,15 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
         uint256 request1SharesAmount = 1e18; // 1 units
         uint256 request3SharesAmount = 5e18; // 5 units
 
+        uint256 request1FeeSharesAmount = 0.1e18; // 10% fee
+        uint256 request3FeeSharesAmount = 0.5e18; // 10% fee
+
         uint256 redeemAssetToValueAssetRate = 3e8; // 1 redeemAsset : 3 valueAsset
         bool quotedInValueAsset = false;
         uint256 sharePrice = 1e18; // Keep it simple with 1:1 share price
 
-        uint256 request1ExpectedAssetAmount = 3e6; // 3 units
-        uint256 request3ExpectedAssetAmount = 15e6; // 15 units
+        uint256 request1ExpectedAssetAmount = 2.7e6; // 3 units - 10% fee
+        uint256 request3ExpectedAssetAmount = 13.5e6; // 15 units - 10% fee
 
         // Create and set the asset
         uint8 assetDecimals = 6;
@@ -285,6 +288,22 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
             _quotedInValueAsset: quotedInValueAsset,
             _timestampTolerance: 0
         });
+
+        // Mock and set a fee handler with different fee amounts for each request shares amount
+        address mockFeeHandler = makeAddr("mockFeeHandler");
+        feeHandler_mockSettleExitFeeGivenGrossShares({
+            _feeHandler: mockFeeHandler,
+            _feeSharesAmount: request1FeeSharesAmount,
+            _grossSharesAmount: request1SharesAmount
+        });
+        feeHandler_mockSettleExitFeeGivenGrossShares({
+            _feeHandler: mockFeeHandler,
+            _feeSharesAmount: request3FeeSharesAmount,
+            _grossSharesAmount: request3SharesAmount
+        });
+
+        vm.prank(admin);
+        shares.setFeeHandler(mockFeeHandler);
 
         // Set rates
         shares_mockSharePrice({_shares: address(shares), _sharePrice: sharePrice, _timestamp: block.timestamp});
