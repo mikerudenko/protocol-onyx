@@ -184,17 +184,19 @@ contract ContinuousFlatRatePerformanceFeeTrackerTest is TestHelpers {
         // Report share price increase
         uint256 netValue = 30_000;
         uint256 sharesSupply = 10_000;
-        uint256 valuePerShare = 3e18;
+        // valuePerShare = 3e18;
         uint16 rate = 1_000; // 10%
         // value due = 20,000 value increase * 10% = 2,000
         uint256 expectedValueDue = 2_000;
+        // valueDuePerShare = 0.2e18; // valueDue / sharesSupply in shares precision
+        uint256 expectedHwm = 2.8e18; // valuePerShare - valueDuePerShare;
 
         increaseSharesSupply({_shares: address(shares), _increaseAmount: sharesSupply});
 
         __test_settlePerformanceFee_success({
             _rate: rate,
             _netValue: netValue,
-            _expectedHwm: valuePerShare, // new hwm
+            _expectedHwm: expectedHwm,
             _expectedValueDue: expectedValueDue
         });
     }

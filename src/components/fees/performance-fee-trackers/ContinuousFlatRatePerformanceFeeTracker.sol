@@ -130,8 +130,15 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
         });
         valueDue_ = (valueIncrease * getRate()) / ONE_HUNDRED_PERCENT_BPS;
 
-        // Always settle, even if no value is due
-        __updateHighWaterMark({_sharePrice: valuePerShare});
+        // Always settle, even if no value is due.
+        // Use the net share value post-performance fee settlement.
+        uint256 netValueIncludingFee = _netValue - valueDue_;
+        __updateHighWaterMark({
+            _sharePrice: ValueHelpersLib.calcValuePerShare({
+                _totalValue: netValueIncludingFee,
+                _totalSharesAmount: sharesSupply
+            })
+        });
 
         emit Settled({valueDue: valueDue_});
     }
