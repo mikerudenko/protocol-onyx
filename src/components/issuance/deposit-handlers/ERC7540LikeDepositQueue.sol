@@ -268,8 +268,8 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
             emit DepositRequestExecuted({requestId: requestId, sharesAmount: netShares});
         }
 
-        // Send the total deposit asset amount to the designated account
-        IERC20(asset()).safeTransfer(shares.getDepositAssetsDest(), totalAssetsDeposited);
+        // Send the total deposit asset amount to Shares
+        IERC20(asset()).safeTransfer(address(shares), totalAssetsDeposited);
     }
 
     //==================================================================================================================

@@ -287,15 +287,8 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         vm.prank(admin);
         feeHandler.setFeeAsset({_asset: address(mockFeeAsset)});
 
-        // Set the fee assets src...
-        address feeAssetsSrc = makeAddr("test_claimFees:feeAssetsSrc");
-        vm.prank(admin);
-        shares.setFeeAssetsSrc(feeAssetsSrc);
-        // ... seed it with the fee asset amount due...
-        mockFeeAsset.mintTo(feeAssetsSrc, expectedFeeAssetAmount);
-        // ... and grant the due allowance to Shares
-        vm.prank(feeAssetsSrc);
-        mockFeeAsset.approve(address(shares), expectedFeeAssetAmount);
+        // Seed Shares with the fee asset amount due
+        mockFeeAsset.mintTo(address(shares), expectedFeeAssetAmount);
 
         uint256 unclaimedValue = valueDue - valueToClaim;
 

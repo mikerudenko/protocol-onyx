@@ -178,7 +178,6 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     /// @return feeAssetAmount_ The amount of the fee asset transferred to _onBehalf
     /// @dev Only callable by admin, in order to give discretion on when fees are paid out.
     /// Fees are paid in the current fee asset set in this contract.
-    /// Expects feeAssetAmount_ to be available in Shares' feeAssetsSrc
     function claimFees(address _onBehalf, uint256 _value) external onlyAdminOrOwner returns (uint256 feeAssetAmount_) {
         // `_value > owed` reverts in __updateValueOwed()
 
@@ -191,7 +190,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
 
         __updateValueOwed({_user: _onBehalf, _delta: -int256(_value)});
 
-        shares.withdrawFeeAssetTo({_asset: feeAsset, _to: _onBehalf, _amount: feeAssetAmount_});
+        shares.withdrawAssetTo({_asset: feeAsset, _to: _onBehalf, _amount: feeAssetAmount_});
 
         emit FeesClaimed({onBehalf: _onBehalf, value: _value, feeAsset: feeAsset, feeAssetAmount: feeAssetAmount_});
     }

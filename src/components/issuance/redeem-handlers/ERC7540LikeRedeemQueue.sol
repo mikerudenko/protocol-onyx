@@ -195,7 +195,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
             shares.burnFor({_from: address(this), _sharesAmount: request.sharesAmount});
 
             // Send asset to the user
-            shares.withdrawRedeemAssetTo({_asset: asset(), _to: request.controller, _amount: userAssets});
+            shares.withdrawAssetTo({_asset: asset(), _to: request.controller, _amount: userAssets});
 
             // Required event for ERC7540
             emit Withdraw({

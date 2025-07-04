@@ -310,15 +310,8 @@ contract ERC7540LikeRedeemQueueTest is TestHelpers {
         mockOracle.setRate(redeemAssetToValueAssetRate);
         mockOracle.setTimestamp(block.timestamp);
 
-        // Shares: Set the redeem asset source...
-        address redeemAssetsSrc = makeAddr("redeemAssetsSrc");
-        vm.prank(admin);
-        shares.setRedeemAssetsSrc(redeemAssetsSrc);
-        // ... and seed it with the asset ...
-        deal(asset, redeemAssetsSrc, 1000 * 10 ** IERC20(asset).decimals(), true);
-        // ... and grant Shares approval to use its asset
-        vm.prank(redeemAssetsSrc);
-        IERC20(asset).approve(address(shares), type(uint256).max);
+        // Seed Shares with the asset
+        deal(asset, address(shares), 1000 * 10 ** IERC20(asset).decimals(), true);
 
         // Seed controllers with shares, and grant allowance to the queue
         address[3] memory controllers = [request1Controller, request2Controller, request3Controller];

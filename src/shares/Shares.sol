@@ -39,9 +39,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     /// @custom:storage-location erc7201:enzyme.Shares
     /// @param valueAsset A representation of the asset of account in which core values are reported (e.g., USD)
-    /// @param depositAssetsDest The account to which deposits are transferred
-    /// @param redeemAssetsSrc The account from which assets are withdrawn to fulfill redemptions
-    /// @param feeAssetsSrc The account from which assets are withdrawn to fulfill fee claims
     /// @param feeHandler The contract that handles fees (settlement, claims, accounting)
     /// @param sharesTransferValidator A contract that supplies shares transfer validation
     /// @param valuationHandler The contract that handles valuation-related operations
@@ -51,9 +48,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     /// @dev `valueAsset` is not used within the system, but is stored on-chain in case needed by integrators.
     struct SharesStorage {
         bytes32 valueAsset;
-        address depositAssetsDest;
-        address redeemAssetsSrc;
-        address feeAssetsSrc;
         address feeHandler;
         address sharesTransferValidator;
         address valuationHandler;
@@ -77,17 +71,13 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
 
     event AdminRemoved(address admin);
 
-    event DepositAssetsDestSet(address dest);
+    event AssetWithdrawn(address caller, address asset, address to, uint256 amount);
 
     event DepositHandlerAdded(address depositHandler);
 
     event DepositHandlerRemoved(address depositHandler);
 
-    event FeeAssetsSrcSet(address src);
-
     event FeeHandlerSet(address feeHandler);
-
-    event RedeemAssetsSrcSet(address src);
 
     event RedeemHandlerAdded(address redeemHandler);
 
@@ -138,6 +128,8 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     error Shares__SetValueAsset__Empty();
 
     error Shares__ValidateTransferRecipient__NotAllowed();
+
+    error Shares__WithdrawAssetTo__Unauthorized();
 
     //==================================================================================================================
     // Modifiers
@@ -269,29 +261,6 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // Config (access: admin or owner)
     //==================================================================================================================
 
-    // ASSET SOURCES AND DESTINATIONS
-
-    function setDepositAssetsDest(address _depositAssetsDest) external onlyAdminOrOwner {
-        SharesStorage storage $ = __getSharesStorage();
-        $.depositAssetsDest = _depositAssetsDest;
-
-        emit DepositAssetsDestSet(_depositAssetsDest);
-    }
-
-    function setFeeAssetsSrc(address _feeAssetsSrc) external onlyAdminOrOwner {
-        SharesStorage storage $ = __getSharesStorage();
-        $.feeAssetsSrc = _feeAssetsSrc;
-
-        emit FeeAssetsSrcSet(_feeAssetsSrc);
-    }
-
-    function setRedeemAssetsSrc(address _redeemAssetsSrc) external onlyAdminOrOwner {
-        SharesStorage storage $ = __getSharesStorage();
-        $.redeemAssetsSrc = _redeemAssetsSrc;
-
-        emit RedeemAssetsSrcSet(_redeemAssetsSrc);
-    }
-
     // SYSTEM CONTRACTS
 
     function addDepositHandler(address _handler) external onlyAdminOrOwner {
@@ -403,16 +372,18 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         _burn(_from, _sharesAmount);
     }
 
-    /// @dev Callable by: RedeemHandler
-    function withdrawRedeemAssetTo(address _asset, address _to, uint256 _amount) external onlyRedeemHandler {
-        IERC20(_asset).safeTransferFrom(getRedeemAssetsSrc(), _to, _amount);
-    }
+    // ASSET TRANSFERS
 
-    // FEES FLOW
+    /// @dev Callable by: admin, RedeemHandler, FeeHandler
+    function withdrawAssetTo(address _asset, address _to, uint256 _amount) external {
+        require(
+            isAdminOrOwner(msg.sender) || isRedeemHandler(msg.sender) || msg.sender == getFeeHandler(),
+            Shares__WithdrawAssetTo__Unauthorized()
+        );
 
-    /// @dev Callable by: FeeHandler
-    function withdrawFeeAssetTo(address _asset, address _to, uint256 _amount) external onlyFeeHandler {
-        IERC20(_asset).safeTransferFrom(getFeeAssetsSrc(), _to, _amount);
+        IERC20(_asset).safeTransfer(_to, _amount);
+
+        emit AssetWithdrawn({caller: msg.sender, asset: _asset, to: _to, amount: _amount});
     }
 
     //==================================================================================================================
@@ -428,28 +399,9 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // State getters
     //==================================================================================================================
 
-    /// @notice Returns the destination for assets received from deposits
-    /// @dev Reverts if unset in order to prevent sending assets to address(0)
-    function getDepositAssetsDest() public view returns (address) {
-        address depositAssetsDest = __getSharesStorage().depositAssetsDest;
-        require(depositAssetsDest != address(0), Shares__GetDepositAssetsDest__NotSet());
-
-        return depositAssetsDest;
-    }
-
-    /// @notice Returns the source for assets used for fee claims
-    function getFeeAssetsSrc() public view returns (address) {
-        return __getSharesStorage().feeAssetsSrc;
-    }
-
     /// @notice Returns the contract that handles fees logic
     function getFeeHandler() public view returns (address) {
         return __getSharesStorage().feeHandler;
-    }
-
-    /// @notice Returns the source for assets used for redemptions
-    function getRedeemAssetsSrc() public view returns (address) {
-        return __getSharesStorage().redeemAssetsSrc;
     }
 
     /// @notice Returns the contract that validates shares transfers

@@ -193,74 +193,6 @@ contract SharesTest is Test, TestHelpers {
         assertFalse(shares.isAdminOrOwner(randomUser));
     }
 
-    // ASSET SOURCES AND DESTINATIONS
-
-    function test_setDepositAssetsDest_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-        address newDepositAssetsDest = makeAddr("newDepositAssetsDest");
-
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.setDepositAssetsDest(newDepositAssetsDest);
-    }
-
-    function test_setDepositAssetsDest_success() public {
-        address newDepositAssetsDest = makeAddr("newDepositAssetsDest");
-
-        vm.expectEmit(address(shares));
-        emit Shares.DepositAssetsDestSet(newDepositAssetsDest);
-
-        vm.prank(admin);
-        shares.setDepositAssetsDest(newDepositAssetsDest);
-
-        assertEq(shares.getDepositAssetsDest(), newDepositAssetsDest);
-    }
-
-    function test_setFeeAssetsSrc_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-        address newFeeAssetsSrc = makeAddr("newFeeAssetsSrc");
-
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.setFeeAssetsSrc(newFeeAssetsSrc);
-    }
-
-    function test_setFeeAssetsSrc_success() public {
-        address newFeeAssetsSrc = makeAddr("newFeeAssetsSrc");
-
-        vm.expectEmit(address(shares));
-        emit Shares.FeeAssetsSrcSet(newFeeAssetsSrc);
-
-        vm.prank(admin);
-        shares.setFeeAssetsSrc(newFeeAssetsSrc);
-
-        assertEq(shares.getFeeAssetsSrc(), newFeeAssetsSrc);
-    }
-
-    function test_setRedeemAssetsSrc_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-        address newRedeemAssetsSrc = makeAddr("newRedeemAssetsSrc");
-
-        vm.expectRevert(Shares.Shares__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.setRedeemAssetsSrc(newRedeemAssetsSrc);
-    }
-
-    function test_setRedeemAssetsSrc_success() public {
-        address newRedeemAssetsSrc = makeAddr("newRedeemAssetsSrc");
-
-        vm.expectEmit(address(shares));
-        emit Shares.RedeemAssetsSrcSet(newRedeemAssetsSrc);
-
-        vm.prank(admin);
-        shares.setRedeemAssetsSrc(newRedeemAssetsSrc);
-
-        assertEq(shares.getRedeemAssetsSrc(), newRedeemAssetsSrc);
-    }
-
     // SYSTEM CONTRACTS
 
     function test_addDepositHandler_fail_alreadyAdded() public {
@@ -711,77 +643,51 @@ contract SharesTest is Test, TestHelpers {
         assertEq(shares.balanceOf(from), initialFromBalance - sharesToBurn);
     }
 
-    function test_withdrawRedeemAssetTo_fail_unauthorized() public {
+    function test_withdrawAssetTo_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");
 
-        vm.expectRevert(Shares.Shares__OnlyRedeemHandler__Unauthorized.selector);
+        vm.expectRevert(Shares.Shares__WithdrawAssetTo__Unauthorized.selector);
 
         vm.prank(randomUser);
-        shares.withdrawRedeemAssetTo({_asset: address(0), _to: address(0), _amount: 0});
+        shares.withdrawAssetTo({_asset: address(0), _to: address(0), _amount: 0});
     }
 
-    function test_withdrawRedeemAssetTo_success() public {
-        MockERC20 mockToken = new MockERC20(18);
-        address to = makeAddr("withdrawRedeemAssetTo:to");
-        uint256 amount = 123;
-        uint256 srcInitialBalance = amount * 11;
+    function test_withdrawAssetTo_success_fromAdmin() public {
+        __test_withdrawAssetTo_success({_caller: admin});
+    }
 
-        address redeemAssetsSrc = makeAddr("withdrawRedeemAssetTo:redeemAssetsSrc");
+    function test_withdrawAssetTo_success_fromFeeHandler() public {
+        address feeHandler = makeAddr("feeHandler");
         vm.prank(owner);
-        shares.setRedeemAssetsSrc(redeemAssetsSrc);
+        shares.setFeeHandler(feeHandler);
 
-        // Send some token to redeem assets src
-        mockToken.mintTo(redeemAssetsSrc, srcInitialBalance);
+        __test_withdrawAssetTo_success({_caller: feeHandler});
+    }
 
-        // Grant max allowance to shares
-        vm.prank(redeemAssetsSrc);
-        mockToken.approve(address(shares), type(uint256).max);
-
-        address redeemHandler = makeAddr("withdrawRedeemAssetTo:redeemHandler");
+    function test_withdrawAssetTo_success_fromRedeemHandler() public {
+        address redeemHandler = makeAddr("redeemHandler");
         vm.prank(owner);
         shares.addRedeemHandler(redeemHandler);
 
-        vm.prank(redeemHandler);
-        shares.withdrawRedeemAssetTo({_asset: address(mockToken), _to: to, _amount: amount});
-
-        assertEq(mockToken.balanceOf(redeemAssetsSrc), srcInitialBalance - amount);
-        assertEq(mockToken.balanceOf(to), amount);
+        __test_withdrawAssetTo_success({_caller: redeemHandler});
     }
 
-    function test_withdrawFeeAssetTo_fail_unauthorized() public {
-        address randomUser = makeAddr("randomUser");
-
-        vm.expectRevert(Shares.Shares__OnlyFeeHandler__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        shares.withdrawFeeAssetTo({_asset: address(0), _to: address(0), _amount: 0});
-    }
-
-    function test_withdrawFeeAssetTo_success() public {
+    function __test_withdrawAssetTo_success(address _caller) internal {
         MockERC20 mockToken = new MockERC20(18);
-        address to = makeAddr("withdrawFeeAssetTo:to");
+        address to = makeAddr("withdrawAssetTo:to");
         uint256 amount = 123;
-        uint256 srcInitialBalance = amount * 11;
+        uint256 initialBalance = amount * 11;
 
-        address feeAssetsSrc = makeAddr("withdrawFeeAssetTo:feeAssetsSrc");
-        vm.prank(owner);
-        shares.setFeeAssetsSrc(feeAssetsSrc);
+        // Mint some token to Shares
+        mockToken.mintTo(address(shares), initialBalance);
 
-        // Send some token to redeem assets src
-        mockToken.mintTo(feeAssetsSrc, srcInitialBalance);
+        vm.expectEmit(address(shares));
+        emit Shares.AssetWithdrawn({caller: _caller, to: to, asset: address(mockToken), amount: amount});
 
-        // Grant max allowance to shares
-        vm.prank(feeAssetsSrc);
-        mockToken.approve(address(shares), type(uint256).max);
+        vm.prank(_caller);
+        shares.withdrawAssetTo({_asset: address(mockToken), _to: to, _amount: amount});
 
-        address feeHandler = makeAddr("withdrawFeeAssetTo:feeHandler");
-        vm.prank(owner);
-        shares.setFeeHandler(address(feeHandler));
-
-        vm.prank(feeHandler);
-        shares.withdrawFeeAssetTo({_asset: address(mockToken), _to: to, _amount: amount});
-
-        assertEq(mockToken.balanceOf(feeAssetsSrc), srcInitialBalance - amount);
+        assertEq(mockToken.balanceOf(address(shares)), initialBalance - amount);
         assertEq(mockToken.balanceOf(to), amount);
     }
 }

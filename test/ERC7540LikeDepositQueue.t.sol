@@ -462,10 +462,6 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         mockOracle.setRate(valueAssetToDepositAssetRate);
         mockOracle.setTimestamp(block.timestamp);
 
-        // Shares: Set the deposit asset destination
-        vm.prank(admin);
-        shares.setDepositAssetsDest(makeAddr("depositAssetsDest"));
-
         // Seed controllers with asset, and grant allowance to the queue
         address[3] memory controllers = [request1Controller, request2Controller, request3Controller];
         for (uint256 i; i < controllers.length; i++) {
@@ -529,6 +525,9 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         // Assert shares sent
         assertEq(shares.balanceOf(request1Controller), request1ExpectedSharesAmount);
         assertEq(shares.balanceOf(request3Controller), request3ExpectedSharesAmount);
+
+        // Assert assets sent to Shares
+        assertEq(IERC20(asset).balanceOf(address(shares)), request1AssetAmount + request3AssetAmount);
 
         // Assert requests are removed
         assertEq(depositQueue.getDepositRequest(1).controller, address(0));
