@@ -17,7 +17,11 @@ import {ComponentHarnessMixin} from "test/harnesses/utils/ComponentHarnessMixin.
 contract FeeHandlerHarness is FeeHandler, ComponentHarnessMixin {
     constructor(address _shares) ComponentHarnessMixin(_shares) {}
 
-    function exposed_updateValueOwed(address _user, int256 _delta) external {
-        __updateValueOwed({_user: _user, _delta: _delta});
+    function exposed_decreaseValueOwed(address _user, uint256 _delta) external {
+        __decreaseValueOwed({_user: _user, _delta: _delta});
+    }
+
+    function exposed_increaseValueOwed(address _user, uint256 _delta) external {
+        __increaseValueOwed({_user: _user, _delta: _delta});
     }
 }

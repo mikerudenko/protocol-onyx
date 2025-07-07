@@ -564,26 +564,36 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
     // Helpers
     //==================================================================================================================
 
-    function test_updateValueOwed_success_positiveDelta() public {
-        __test_updateValueOwed_success({_initialOwedUserValue: 123, _delta: 456});
+    function test_decreaseValueOwed_success() public {
+        __test_updateValueOwed_success({_initialOwedUserValue: 456, _delta: 123, _decrease: true});
     }
 
-    function test_updateValueOwed_success_negativeDelta() public {
-        __test_updateValueOwed_success({_initialOwedUserValue: 456, _delta: -123});
+    function test_increaseValueOwed_success() public {
+        __test_updateValueOwed_success({_initialOwedUserValue: 123, _delta: 456, _decrease: false});
     }
 
-    function __test_updateValueOwed_success(uint256 _initialOwedUserValue, int256 _delta) internal {
+    function __test_updateValueOwed_success(uint256 _initialOwedUserValue, uint256 _delta, bool _decrease) internal {
         address owedUser = makeAddr("owedUser");
         address randomOwedUser = makeAddr("randomOwedUser");
 
         uint256 randomOwedUserValue = _initialOwedUserValue * 6;
         uint256 initialTotalValue = _initialOwedUserValue + randomOwedUserValue;
 
-        feeHandler.exposed_updateValueOwed({_user: owedUser, _delta: int256(_initialOwedUserValue)});
-        feeHandler.exposed_updateValueOwed({_user: randomOwedUser, _delta: int256(randomOwedUserValue)});
+        uint256 expectedOwedUserValue;
+        uint256 expectedTotalValue;
 
-        uint256 expectedOwedUserValue = uint256(int256(_initialOwedUserValue) + _delta);
-        uint256 expectedTotalValue = uint256(int256(initialTotalValue) + _delta);
+        // first add initial values owed
+        feeHandler.exposed_increaseValueOwed({_user: owedUser, _delta: _initialOwedUserValue});
+        feeHandler.exposed_increaseValueOwed({_user: randomOwedUser, _delta: randomOwedUserValue});
+
+        // calculate expected final values
+        if (_decrease) {
+            expectedOwedUserValue = _initialOwedUserValue - _delta;
+            expectedTotalValue = initialTotalValue - _delta;
+        } else {
+            expectedOwedUserValue = _initialOwedUserValue + _delta;
+            expectedTotalValue = initialTotalValue + _delta;
+        }
 
         vm.expectEmit();
         emit FeeHandler.UserValueOwedUpdated({user: owedUser, value: expectedOwedUserValue});
@@ -592,7 +602,11 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         emit FeeHandler.TotalValueOwedUpdated({value: expectedTotalValue});
 
         vm.prank(address(feeHandler));
-        feeHandler.exposed_updateValueOwed({_user: owedUser, _delta: _delta});
+        if (_decrease) {
+            feeHandler.exposed_decreaseValueOwed({_user: owedUser, _delta: _delta});
+        } else {
+            feeHandler.exposed_increaseValueOwed({_user: owedUser, _delta: _delta});
+        }
 
         assertEq(feeHandler.getValueOwedToUser(owedUser), expectedOwedUserValue);
         assertEq(feeHandler.getTotalValueOwed(), expectedTotalValue);

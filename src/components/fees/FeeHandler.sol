@@ -179,7 +179,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     /// @dev Only callable by admin, in order to give discretion on when fees are paid out.
     /// Fees are paid in the current fee asset set in this contract.
     function claimFees(address _onBehalf, uint256 _value) external onlyAdminOrOwner returns (uint256 feeAssetAmount_) {
-        // `_value > owed` reverts in __updateValueOwed()
+        // `_value > owed` reverts in __decreaseValueOwed()
 
         Shares shares = Shares(__getShares());
         ValuationHandler valuationHandler = ValuationHandler(shares.getValuationHandler());
@@ -188,7 +188,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
         feeAssetAmount_ = valuationHandler.convertValueToAssetAmount({_value: _value, _asset: feeAsset});
         require(feeAssetAmount_ > 0, FeeHandler__ClaimFees__ZeroFeeAsset());
 
-        __updateValueOwed({_user: _onBehalf, _delta: -int256(_value)});
+        __decreaseValueOwed({_user: _onBehalf, _delta: _value});
 
         shares.withdrawAssetTo({_asset: feeAsset, _to: _onBehalf, _amount: feeAssetAmount_});
 
@@ -217,7 +217,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
             managementFeeAmount =
                 IManagementFeeTracker(getManagementFeeTracker()).settleManagementFee({_netValue: netValue});
 
-            __updateValueOwed({_user: getManagementFeeRecipient(), _delta: int256(managementFeeAmount)});
+            __increaseValueOwed({_user: getManagementFeeRecipient(), _delta: managementFeeAmount});
 
             emit ManagementFeeSettled({recipient: getManagementFeeRecipient(), value: managementFeeAmount});
         }
@@ -230,7 +230,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
             performanceFeeAmount =
                 IPerformanceFeeTracker(getPerformanceFeeTracker()).settlePerformanceFee({_netValue: netValue});
 
-            __updateValueOwed({_user: getPerformanceFeeRecipient(), _delta: int256(performanceFeeAmount)});
+            __increaseValueOwed({_user: getPerformanceFeeRecipient(), _delta: performanceFeeAmount});
 
             emit PerformanceFeeSettled({recipient: getPerformanceFeeRecipient(), value: performanceFeeAmount});
         }
@@ -296,7 +296,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
             ValueHelpersLib.calcValueOfSharesAmount({_valuePerShare: sharePrice, _sharesAmount: feeSharesAmount_});
 
         if (recipient != address(0)) {
-            __updateValueOwed({_user: recipient, _delta: int256(value)});
+            __increaseValueOwed({_user: recipient, _delta: value});
         }
         // Effectively "burn" the fee if no recipient, as shares will be destroyed but no value owed
 
@@ -311,16 +311,27 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     // Helpers
     //==================================================================================================================
 
-    function __updateValueOwed(address _user, int256 _delta) internal {
-        uint256 userValueOwed = uint256(int256(getValueOwedToUser(_user)) + _delta);
-        uint256 totalValueOwed = uint256(int256(getTotalValueOwed()) + _delta);
+    function __decreaseValueOwed(address _user, uint256 _delta) internal {
+        uint256 userValueOwed = getValueOwedToUser(_user) - _delta;
+        uint256 totalValueOwed = getTotalValueOwed() - _delta;
 
+        __updateValueOwed({_user: _user, _userValueOwed: userValueOwed, _totalValueOwed: totalValueOwed});
+    }
+
+    function __increaseValueOwed(address _user, uint256 _delta) internal {
+        uint256 userValueOwed = getValueOwedToUser(_user) + _delta;
+        uint256 totalValueOwed = getTotalValueOwed() + _delta;
+
+        __updateValueOwed({_user: _user, _userValueOwed: userValueOwed, _totalValueOwed: totalValueOwed});
+    }
+
+    function __updateValueOwed(address _user, uint256 _userValueOwed, uint256 _totalValueOwed) internal {
         FeeHandlerStorage storage $ = __getFeeHandlerStorage();
-        $.userFeesOwed[_user] = userValueOwed;
-        $.totalFeesOwed = totalValueOwed;
+        $.userFeesOwed[_user] = _userValueOwed;
+        $.totalFeesOwed = _totalValueOwed;
 
-        emit UserValueOwedUpdated({user: _user, value: userValueOwed});
-        emit TotalValueOwedUpdated({value: totalValueOwed});
+        emit UserValueOwedUpdated({user: _user, value: _userValueOwed});
+        emit TotalValueOwedUpdated({value: _totalValueOwed});
     }
 
     //==================================================================================================================
