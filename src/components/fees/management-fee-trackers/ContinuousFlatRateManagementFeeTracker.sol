@@ -31,7 +31,7 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
     bytes32 private immutable MANAGEMENT_FEE_TRACKER_STORAGE_LOCATION =
         StorageHelpersLib.deriveErc7201Location("ManagementFeeTracker");
 
-    /// @custom:storage-location erc7201:enzyme.storage.ManagementFeeTracker
+    /// @custom:storage-location erc7201:enzyme.ManagementFeeTracker
     /// @param rate Management fee rate as an annualized percentage of net value
     /// @param lastSettled Timestamp of the last settlement
     struct ManagementFeeTrackerStorage {

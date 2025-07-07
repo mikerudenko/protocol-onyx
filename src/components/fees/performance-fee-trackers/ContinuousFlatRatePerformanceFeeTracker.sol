@@ -36,7 +36,7 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
     bytes32 private immutable PERFORMANCE_FEE_TRACKER_STORAGE_LOCATION =
         StorageHelpersLib.deriveErc7201Location("PerformanceFeeTracker");
 
-    /// @custom:storage-location erc7201:enzyme.storage.PerformanceFeeTracker
+    /// @custom:storage-location erc7201:enzyme.PerformanceFeeTracker
     /// @param rate Performance fee rate as a percentage of share value increase
     /// @param highWaterMark Current high water mark (share price at last settlement), in shares value asset (18-decimal precision)
     struct PerformanceFeeTrackerStorage {
