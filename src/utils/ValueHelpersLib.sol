@@ -11,6 +11,7 @@
 
 pragma solidity ^0.8.0;
 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IChainlinkAggregator} from "src/interfaces/external/IChainlinkAggregator.sol";
 import {SHARES_PRECISION, VALUE_ASSET_PRECISION} from "src/utils/Constants.sol";
 
@@ -60,10 +61,10 @@ library ValueHelpersLib {
     ) internal pure returns (uint256 quoteAmount_) {
         if (_rateQuotedInBase) {
             // case: base asset-quoted rate
-            return (_baseAmount * _ratePrecision * _quotePrecision) / (_rate * _basePrecision);
+            return Math.mulDiv(_baseAmount * _ratePrecision, _quotePrecision, (_rate * _basePrecision));
         } else {
             // case: quote asset-quoted rate
-            return (_baseAmount * _rate * _quotePrecision) / (_ratePrecision * _basePrecision);
+            return Math.mulDiv(_baseAmount * _rate, _quotePrecision, (_ratePrecision * _basePrecision));
         }
     }
 
