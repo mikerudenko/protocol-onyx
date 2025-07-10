@@ -227,18 +227,12 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         address feeAsset = address(new MockERC20(8));
         address owedUser = makeAddr("test_claimFees_fail_zeroFeeAssetAmount:owedUser");
 
-        // Create the oracle with 1:1 conversion rate of value asset to fee asset
-        MockChainlinkAggregator mockAggregator = new MockChainlinkAggregator(8);
-        mockAggregator.setRate(1e8);
-        mockAggregator.setTimestamp(block.timestamp);
-        bool quotedInValueAsset = true; // doesn't really matter
+        // Set asset rate with 1:1 conversion rate of value asset to fee asset
+        uint128 assetRate = 1e18;
         vm.prank(admin);
-        valuationHandler.setAssetOracle({
-            _asset: feeAsset,
-            _oracle: address(mockAggregator),
-            _quotedInValueAsset: quotedInValueAsset,
-            _timestampTolerance: 0
-        });
+        valuationHandler.setAssetRate(
+            ValuationHandler.AssetRateInput({asset: feeAsset, rate: assetRate, expiry: uint40(block.timestamp + 1)})
+        );
 
         // Set the fee asset
         vm.prank(admin);
@@ -252,13 +246,11 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
 
     function test_claimFees_success() public {
         // Define all amount values
-        uint256 valueDue = 500e18;
-        uint256 valueToClaim = 100e18; // 100 value units
-        uint8 feeAssetDecimals = 6;
-        uint8 oracleDecimals = 9; // diff decimals from fee asset
-        uint256 oracleRate = 3e9; // 1 value unit => 3 fee units
-        bool quotedInValueAsset = false;
-        uint256 expectedFeeAssetAmount = 300e6; // 300 fee asset units
+        uint256 valueDue = 300e18; // 300 value units
+        uint256 valueToClaim = 30e18; // 30 value units
+        uint8 feeAssetDecimals = 18;
+        uint256 assetRate = 3e18; // 3 value units = 1 fee unit (the rate is how many value units per 1 fee asset unit)
+        uint256 expectedFeeAssetAmount = 10e18; // 30/3 = 10 fee asset units
 
         // Create the fee asset
         MockERC20 mockFeeAsset = new MockERC20(feeAssetDecimals);
@@ -271,17 +263,15 @@ contract FeeHandlerTest is Test, FeeHandlerTestHelpers {
         address feeRecipient = feeHandler.getManagementFeeRecipient();
         assertEq(feeHandler.getValueOwedToUser(feeRecipient), valueDue);
 
-        // Create the oracle with conversion rate of value asset to fee asset
-        MockChainlinkAggregator mockAggregator = new MockChainlinkAggregator(oracleDecimals);
-        mockAggregator.setRate(oracleRate);
-        mockAggregator.setTimestamp(block.timestamp);
+        // Set asset rate with conversion rate of value asset to fee asset
         vm.prank(admin);
-        valuationHandler.setAssetOracle({
-            _asset: address(mockFeeAsset),
-            _oracle: address(mockAggregator),
-            _quotedInValueAsset: quotedInValueAsset,
-            _timestampTolerance: 0
-        });
+        valuationHandler.setAssetRate(
+            ValuationHandler.AssetRateInput({
+                asset: address(mockFeeAsset),
+                rate: uint128(assetRate),
+                expiry: uint40(block.timestamp + 1)
+            })
+        );
 
         // Set the fee asset
         vm.prank(admin);

@@ -16,7 +16,6 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ComponentHelpersMixin} from "src/components/utils/ComponentHelpersMixin.sol";
 import {IPositionTracker} from "src/components/value/position-trackers/IPositionTracker.sol";
-import {IChainlinkAggregator} from "src/interfaces/external/IChainlinkAggregator.sol";
 import {IFeeHandler} from "src/interfaces/IFeeHandler.sol";
 import {IValuationHandler} from "src/interfaces/IValuationHandler.sol";
 import {Shares} from "src/shares/Shares.sol";
@@ -33,22 +32,26 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     using SafeCast for int256;
     using SafeCast for uint256;
 
+    uint256 public constant RATE_PRECISION = 10 ** 18;
+
     //==================================================================================================================
     // Types
     //==================================================================================================================
 
-    /// @dev Stores information about the oracle used to convert a given asset to/from the Shares value asset
-    /// @param oracle The address of the oracle contract
-    /// @param quotedInValueAsset True if, e.g., value asset is USD and oracle is ETH/USD; false if USD/ETH
-    /// @param timestampTolerance The duration of validity for the oracle's rate (in seconds)
-    /// @param oracleDecimals (cache) The number of decimals in the oracle rate's precision
-    /// @param assetDecimals (cache) The number of decimals in the asset's precision
-    struct AssetOracleInfo {
-        address oracle;
-        bool quotedInValueAsset;
-        uint24 timestampTolerance;
-        uint8 oracleDecimals;
-        uint8 assetDecimals;
+    /// @param asset The base asset of the rate
+    /// @param rate The rate of the asset, quoted in Shares value asset, with 18 decimals of precision
+    /// @param expiry The timestamp after which the rate will be considered invalid
+    struct AssetRateInput {
+        address asset;
+        uint128 rate;
+        uint40 expiry;
+    }
+
+    /// @param rate The rate of the asset, quoted in Shares value asset, with 18 decimals of precision
+    /// @param expiry The timestamp after which the rate will be considered invalid
+    struct AssetRateInfo {
+        uint128 rate;
+        uint40 expiry;
     }
 
     //==================================================================================================================
@@ -60,12 +63,12 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
 
     /// @custom:storage-location erc7201:enzyme.ValuationHandler
     /// @param positionTrackers The set of IPositionTracker contracts queried to aggregate on-chain "tracked value"
-    /// @param assetToOracle A mapping of assets to their oracle information
+    /// @param assetToRate A mapping of assets to rate info
     /// @param lastShareValue The share value at most recent update (18-decimal precision)
     /// @param lastShareValueTimestamp The timestamp when lastShareValue was stored
     struct ValuationHandlerStorage {
         EnumerableSet.AddressSet positionTrackers;
-        mapping(address => AssetOracleInfo) assetToOracle;
+        mapping(address => AssetRateInfo) assetToRate;
         uint128 lastShareValue;
         uint40 lastShareValueTimestamp;
     }
@@ -81,9 +84,7 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     // Events
     //==================================================================================================================
 
-    event AssetOracleSet(address asset, address oracle, bool quotedInValueAsset, uint24 timestampTolerance);
-
-    event AssetOracleUnset(address asset);
+    event AssetRateSet(address asset, uint128 rate, uint40 expiry);
 
     event PositionTrackerAdded(address positionTracker);
 
@@ -100,6 +101,10 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     error ValuationHandler__AddPositionTracker__AlreadyAdded();
 
     error ValuationHandler__RemovePositionTracker__AlreadyRemoved();
+
+    error ValuationHandler__ValidateRate__RateExpired();
+
+    error ValuationHandler__ValidateRate__RateNotSet();
 
     //==================================================================================================================
     // Config (access: admin or owner)
@@ -123,68 +128,39 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
         emit PositionTrackerRemoved(_positionTracker);
     }
 
-    /// @notice Sets the oracle to convert a given asset to/from the Shares value asset
-    /// @param _asset The asset
-    /// @param _oracle The oracle contract
-    /// @param _quotedInValueAsset True if the oracle rate is quoted in the value asset, false if in _asset
-    /// @param _timestampTolerance The duration of validity for the oracle's rate (in seconds)
-    function setAssetOracle(address _asset, address _oracle, bool _quotedInValueAsset, uint24 _timestampTolerance)
-        external
-        onlyAdminOrOwner
-    {
-        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
-        $.assetToOracle[_asset] = AssetOracleInfo({
-            oracle: _oracle,
-            quotedInValueAsset: _quotedInValueAsset,
-            timestampTolerance: _timestampTolerance,
-            oracleDecimals: IChainlinkAggregator(_oracle).decimals(),
-            assetDecimals: IERC20(_asset).decimals()
-        });
-
-        emit AssetOracleSet({
-            asset: _asset,
-            oracle: _oracle,
-            quotedInValueAsset: _quotedInValueAsset,
-            timestampTolerance: _timestampTolerance
-        });
-    }
-
-    function unsetAssetOracle(address _asset) external onlyAdminOrOwner {
-        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
-        delete $.assetToOracle[_asset];
-
-        emit AssetOracleUnset({asset: _asset});
-    }
-
     //==================================================================================================================
     // Valuation
     //==================================================================================================================
 
     /// @dev Returns 18-decimal precision
     function convertAssetAmountToValue(address _asset, uint256 _assetAmount) public view returns (uint256 value_) {
-        AssetOracleInfo memory oracleInfo = getAssetOracleInfo(_asset);
+        __validateRate(_asset);
 
-        return ValueHelpersLib.convertToValueAssetWithAggregatorV3({
+        AssetRateInfo memory rateInfo = getAssetRateInfo(_asset);
+
+        return ValueHelpersLib.convert({
             _baseAmount: _assetAmount,
-            _basePrecision: 10 ** oracleInfo.assetDecimals,
-            _oracle: oracleInfo.oracle,
-            _oraclePrecision: 10 ** oracleInfo.oracleDecimals,
-            _oracleTimestampTolerance: oracleInfo.timestampTolerance,
-            _oracleQuotedInValueAsset: oracleInfo.quotedInValueAsset
+            _basePrecision: 10 ** IERC20(_asset).decimals(),
+            _quotePrecision: VALUE_ASSET_PRECISION,
+            _rate: rateInfo.rate,
+            _ratePrecision: RATE_PRECISION,
+            _rateQuotedInBase: false
         });
     }
 
     /// @dev Returns _asset precision
     function convertValueToAssetAmount(uint256 _value, address _asset) public view returns (uint256 assetAmount_) {
-        AssetOracleInfo memory oracleInfo = getAssetOracleInfo(_asset);
+        __validateRate(_asset);
 
-        return ValueHelpersLib.convertFromValueAssetWithAggregatorV3({
-            _value: _value,
-            _quotePrecision: 10 ** oracleInfo.assetDecimals,
-            _oracle: oracleInfo.oracle,
-            _oraclePrecision: 10 ** oracleInfo.oracleDecimals,
-            _oracleTimestampTolerance: oracleInfo.timestampTolerance,
-            _oracleQuotedInValueAsset: oracleInfo.quotedInValueAsset
+        AssetRateInfo memory rateInfo = getAssetRateInfo(_asset);
+
+        return ValueHelpersLib.convert({
+            _baseAmount: _value,
+            _basePrecision: VALUE_ASSET_PRECISION,
+            _quotePrecision: 10 ** IERC20(_asset).decimals(),
+            _rate: rateInfo.rate,
+            _ratePrecision: RATE_PRECISION,
+            _rateQuotedInBase: true
         });
     }
 
@@ -221,12 +197,53 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
         return ($.lastShareValue, $.lastShareValueTimestamp);
     }
 
+    function __validateRate(address _asset) internal view {
+        AssetRateInfo memory rateInfo = getAssetRateInfo(_asset);
+        require(rateInfo.rate > 0, ValuationHandler__ValidateRate__RateNotSet());
+        require(rateInfo.expiry > block.timestamp, ValuationHandler__ValidateRate__RateExpired());
+    }
+
     //==================================================================================================================
-    // Share value updates (access: admin or owner)
+    // Value updates (access: admin or owner)
     //==================================================================================================================
+
+    /// @notice Sets the rate of a given asset, quoted in the Shares value asset
+    function setAssetRate(AssetRateInput calldata _rateInput) external onlyAdminOrOwner {
+        __setAssetRate({_asset: _rateInput.asset, _rate: _rateInput.rate, _expiry: _rateInput.expiry});
+    }
+
+    /// @notice Convenience function to execute setAssetRate() and then updateShareValue()
+    /// @dev See natspec of individual functions
+    function setAssetRatesThenUpdateShareValue(AssetRateInput[] calldata _rateInputs, int256 _untrackedPositionsValue)
+        external
+        onlyAdminOrOwner
+        returns (uint256 netShareValue_)
+    {
+        for (uint256 i; i < _rateInputs.length; i++) {
+            AssetRateInput memory rateInput = _rateInputs[i];
+            __setAssetRate({_asset: rateInput.asset, _rate: rateInput.rate, _expiry: rateInput.expiry});
+        }
+
+        return __updateShareValue({_untrackedPositionsValue: _untrackedPositionsValue});
+    }
 
     /// @notice Updates the share value by aggregating the given untracked positions value with tracked on-chain value,
     /// and settling dynamic fees.
+    function updateShareValue(int256 _untrackedPositionsValue)
+        external
+        onlyAdminOrOwner
+        returns (uint256 netShareValue_)
+    {
+        return __updateShareValue({_untrackedPositionsValue: _untrackedPositionsValue});
+    }
+
+    function __setAssetRate(address _asset, uint128 _rate, uint40 _expiry) internal {
+        ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
+        $.assetToRate[_asset] = AssetRateInfo({rate: _rate, expiry: _expiry});
+
+        emit AssetRateSet({asset: _asset, rate: _rate, expiry: _expiry});
+    }
+
     /// @dev _untrackedPositionsValue and netShareValue_ are 18-decimal precision.
     /// If no shares exist:
     /// - logic still runs
@@ -235,11 +252,7 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     /// Reverts if:
     /// - totalPositionsValue < 0
     /// - totalPositionsValue < totalFeesOwed
-    function updateShareValue(int256 _untrackedPositionsValue)
-        external
-        onlyAdminOrOwner
-        returns (uint256 netShareValue_)
-    {
+    function __updateShareValue(int256 _untrackedPositionsValue) internal returns (uint256 netShareValue_) {
         Shares shares = Shares(__getShares());
 
         // Sum tracked positions
@@ -287,9 +300,9 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     // State getters
     //==================================================================================================================
 
-    function getAssetOracleInfo(address _asset) public view returns (AssetOracleInfo memory assetOracleInfo_) {
+    function getAssetRateInfo(address _asset) public view returns (AssetRateInfo memory assetRateInfo_) {
         ValuationHandlerStorage storage $ = __getValuationHandlerStorage();
-        return $.assetToOracle[_asset];
+        return $.assetToRate[_asset];
     }
 
     function getPositionTrackers() public view returns (address[] memory) {

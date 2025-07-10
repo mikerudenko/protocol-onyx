@@ -17,7 +17,6 @@ import {Shares} from "src/shares/Shares.sol";
 import {ValuationHandler} from "src/components/value/ValuationHandler.sol";
 
 import {ValuationHandlerHarness} from "test/harnesses/ValuationHandlerHarness.sol";
-import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TestHelpers} from "test/utils/TestHelpers.sol";
 
@@ -113,146 +112,93 @@ contract ValuationHandlerTest is TestHelpers {
         assertEq(valuationHandler.getPositionTrackers().length, 0);
     }
 
-    function test_setAssetOracle_fail_notAdminOrOwner() public {
-        address randomUser = makeAddr("randomUser");
-        address asset = makeAddr("oracleAsset");
-        address oracle = address(new MockChainlinkAggregator(18));
-
-        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        valuationHandler.setAssetOracle({
-            _asset: asset,
-            _oracle: oracle,
-            _quotedInValueAsset: true,
-            _timestampTolerance: 0
-        });
-    }
-
-    function test_setAssetOracle_success() public {
-        uint8 assetDecimals = 12;
-        address asset = address(new MockERC20(assetDecimals));
-        uint8 oracleDecimals = 7;
-        address oracle = address(new MockChainlinkAggregator(oracleDecimals));
-        uint24 timestampTolerance = 100;
-        bool quotedInValueAsset = true;
-
-        vm.expectEmit();
-        emit ValuationHandler.AssetOracleSet({
-            asset: asset,
-            oracle: oracle,
-            quotedInValueAsset: quotedInValueAsset,
-            timestampTolerance: timestampTolerance
-        });
-
-        vm.prank(admin);
-        valuationHandler.setAssetOracle({
-            _asset: asset,
-            _oracle: oracle,
-            _quotedInValueAsset: quotedInValueAsset,
-            _timestampTolerance: timestampTolerance
-        });
-
-        ValuationHandler.AssetOracleInfo memory oracleInfo = valuationHandler.getAssetOracleInfo({_asset: asset});
-
-        assertEq(oracleInfo.oracle, oracle);
-        assertEq(oracleInfo.timestampTolerance, timestampTolerance);
-        assertEq(oracleInfo.quotedInValueAsset, quotedInValueAsset);
-        assertEq(oracleInfo.oracleDecimals, oracleDecimals);
-        assertEq(oracleInfo.assetDecimals, assetDecimals);
-    }
-
-    function test_unsetAssetOracle_fail_notAdminOrOwner() public {
-        address randomUser = makeAddr("randomUser");
-        address asset = makeAddr("asset");
-
-        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
-
-        vm.prank(randomUser);
-        valuationHandler.unsetAssetOracle(asset);
-    }
-
-    function test_unsetAssetOracle_success() public {
-        address asset = address(new MockERC20(12));
-        address oracle = address(new MockChainlinkAggregator(7));
-
-        // Set oracle
-        vm.prank(admin);
-        valuationHandler.setAssetOracle({
-            _asset: asset,
-            _oracle: oracle,
-            _quotedInValueAsset: true,
-            _timestampTolerance: 100
-        });
-
-        vm.expectEmit();
-        emit ValuationHandler.AssetOracleUnset({asset: asset});
-
-        // Unset oracle
-        vm.prank(admin);
-        valuationHandler.unsetAssetOracle(asset);
-
-        ValuationHandler.AssetOracleInfo memory oracleInfo = valuationHandler.getAssetOracleInfo({_asset: asset});
-        assertEq(oracleInfo.oracle, address(0));
-        assertEq(oracleInfo.timestampTolerance, 0);
-        assertEq(oracleInfo.quotedInValueAsset, false);
-        assertEq(oracleInfo.oracleDecimals, 0);
-        assertEq(oracleInfo.assetDecimals, 0);
-    }
-
     //==================================================================================================================
     // Valuation
     //==================================================================================================================
 
+    function test_convertAssetAmountToValue_fail_rateExpired() public {
+        address asset = makeAddr("rateAsset");
+        uint40 badExpiry = uint40(block.timestamp - 1);
+
+        // Set rate with
+        vm.prank(admin);
+        valuationHandler.setAssetRate(ValuationHandler.AssetRateInput({asset: asset, rate: 1e18, expiry: badExpiry}));
+
+        vm.expectRevert(ValuationHandler.ValuationHandler__ValidateRate__RateExpired.selector);
+
+        valuationHandler.convertAssetAmountToValue({_asset: asset, _assetAmount: 1});
+    }
+
+    function test_convertAssetAmountToValue_fail_rateNotSet() public {
+        address asset = makeAddr("rateAsset");
+
+        // Set rate as 0
+        vm.prank(admin);
+        valuationHandler.setAssetRate(
+            ValuationHandler.AssetRateInput({asset: asset, rate: 0, expiry: uint40(block.timestamp + 1)})
+        );
+
+        vm.expectRevert(ValuationHandler.ValuationHandler__ValidateRate__RateNotSet.selector);
+
+        valuationHandler.convertAssetAmountToValue({_asset: asset, _assetAmount: 1});
+    }
+
     function test_convertAssetAmountToValue_success() public {
         uint8 assetDecimals = 6;
-        uint256 assetAmount = 15e6; // 15 units
         address asset = address(new MockERC20(assetDecimals));
+        uint256 assetAmount = 5e6; // 5 units
+        uint128 rate = 3e18; // 1 asset : 3 value asset
+        uint256 expectedValue = 15e18; // 15 value units
 
-        uint8 oracleDecimals = 8;
-        uint256 oracleRate = 3e8; // 1 valueAsset : 3 asset
-        bool quotedInValueAsset = false;
-        MockChainlinkAggregator oracle = new MockChainlinkAggregator(oracleDecimals);
-        oracle.setRate(oracleRate);
-        oracle.setTimestamp(block.timestamp);
-
-        uint256 expectedValue = 5e18; // 5 value units
-
-        // Set oracle
+        // Set rate
         vm.prank(admin);
-        valuationHandler.setAssetOracle({
-            _asset: asset,
-            _oracle: address(oracle),
-            _quotedInValueAsset: quotedInValueAsset,
-            _timestampTolerance: 0
-        });
+        valuationHandler.setAssetRate(
+            ValuationHandler.AssetRateInput({asset: asset, rate: rate, expiry: uint40(block.timestamp + 1)})
+        );
 
         uint256 actualValue = valuationHandler.convertAssetAmountToValue({_asset: asset, _assetAmount: assetAmount});
         assertEq(actualValue, expectedValue);
     }
 
+    function test_convertValueToAssetAmount_fail_rateExpired() public {
+        address asset = makeAddr("rateAsset");
+        uint40 badExpiry = uint40(block.timestamp - 1);
+
+        // Set rate with
+        vm.prank(admin);
+        valuationHandler.setAssetRate(ValuationHandler.AssetRateInput({asset: asset, rate: 1e18, expiry: badExpiry}));
+
+        vm.expectRevert(ValuationHandler.ValuationHandler__ValidateRate__RateExpired.selector);
+
+        valuationHandler.convertValueToAssetAmount({_value: 1, _asset: asset});
+    }
+
+    function test_convertValueToAssetAmount_fail_rateNotSet() public {
+        address asset = makeAddr("rateAsset");
+
+        // Set rate as 0
+        vm.prank(admin);
+        valuationHandler.setAssetRate(
+            ValuationHandler.AssetRateInput({asset: asset, rate: 0, expiry: uint40(block.timestamp + 1)})
+        );
+
+        vm.expectRevert(ValuationHandler.ValuationHandler__ValidateRate__RateNotSet.selector);
+
+        valuationHandler.convertValueToAssetAmount({_value: 1, _asset: asset});
+    }
+
     function test_convertValueToAssetAmount_success() public {
-        uint256 value = 5e18; // 5 value units
-
-        uint8 oracleDecimals = 8;
-        uint256 oracleRate = 3e8; // 1 valueAsset : 3 asset
-        bool quotedInValueAsset = false;
-        MockChainlinkAggregator oracle = new MockChainlinkAggregator(oracleDecimals);
-        oracle.setRate(oracleRate);
-        oracle.setTimestamp(block.timestamp);
-
         uint8 assetDecimals = 6;
         address asset = address(new MockERC20(assetDecimals));
-        uint256 expectedAssetAmount = 15e6; // 15 units
+        uint256 value = 15e18; // 15 value units
+        uint128 rate = 3e18; // 1 asset : 3 value asset
+        uint256 expectedAssetAmount = 5e6; // 5 units
 
-        // Set oracle
+        // Set rate
         vm.prank(admin);
-        valuationHandler.setAssetOracle({
-            _asset: asset,
-            _oracle: address(oracle),
-            _quotedInValueAsset: quotedInValueAsset,
-            _timestampTolerance: 0
-        });
+        valuationHandler.setAssetRate(
+            ValuationHandler.AssetRateInput({asset: asset, rate: rate, expiry: uint40(block.timestamp + 1)})
+        );
 
         uint256 actualAssetAmount = valuationHandler.convertValueToAssetAmount({_value: value, _asset: asset});
         assertEq(actualAssetAmount, expectedAssetAmount);
@@ -282,35 +228,26 @@ contract ValuationHandlerTest is TestHelpers {
     }
 
     function test_getSharePriceAsAssetAmount_success() public {
+        uint256 shareValue = 15e18; // 15 value units
+        uint128 rate = 3e18; // 1 asset : 3 valueAsset
+        uint8 assetDecimals = 6;
+        uint256 expectedAssetAmount = 5e6; // 5 units
+
         // Warp to arbitrary time
         vm.warp(12345);
 
         // Set share value
-        uint256 shareValue = 5e18; // 5 value units
         uint256 shareValueTimestamp = block.timestamp - 11;
         valuationHandler.harness_setLastShareValue({_shareValue: shareValue, _timestamp: shareValueTimestamp});
 
-        // Create oracle
-        uint8 oracleDecimals = 8;
-        uint256 oracleRate = 3e8; // 1 valueAsset : 3 asset
-        bool quotedInValueAsset = false;
-        MockChainlinkAggregator oracle = new MockChainlinkAggregator(oracleDecimals);
-        oracle.setRate(oracleRate);
-        oracle.setTimestamp(block.timestamp);
-
         // Create asset
-        uint8 assetDecimals = 6;
         address asset = address(new MockERC20(assetDecimals));
-        uint256 expectedAssetAmount = 15e6; // 15 units
 
-        // Set oracle
+        // Set rate
         vm.prank(admin);
-        valuationHandler.setAssetOracle({
-            _asset: asset,
-            _oracle: address(oracle),
-            _quotedInValueAsset: quotedInValueAsset,
-            _timestampTolerance: 0
-        });
+        valuationHandler.setAssetRate(
+            ValuationHandler.AssetRateInput({asset: asset, rate: rate, expiry: uint40(block.timestamp + 1)})
+        );
 
         (uint256 actualAssetAmount, uint256 actualTimestamp) =
             valuationHandler.getSharePriceAsAssetAmount({_asset: asset});
@@ -326,6 +263,87 @@ contract ValuationHandlerTest is TestHelpers {
     // - negative tracked positions value
     // - negative untracked positions value
     // - other combos
+
+    function test_setAssetRate_fail_notAdminOrOwner() public {
+        address randomUser = makeAddr("randomUser");
+
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        vm.prank(randomUser);
+        valuationHandler.setAssetRate(ValuationHandler.AssetRateInput({asset: address(0), rate: 0, expiry: 0}));
+    }
+
+    function test_setAssetRate_success() public {
+        address asset = makeAddr("rateAsset");
+        uint128 rate = 5e18;
+        uint40 expiry = 123;
+
+        vm.expectEmit();
+        emit ValuationHandler.AssetRateSet({asset: asset, rate: rate, expiry: expiry});
+
+        vm.prank(admin);
+        valuationHandler.setAssetRate(ValuationHandler.AssetRateInput({asset: asset, rate: rate, expiry: expiry}));
+
+        ValuationHandler.AssetRateInfo memory rateInfo = valuationHandler.getAssetRateInfo({_asset: asset});
+
+        assertEq(rateInfo.rate, rate);
+        assertEq(rateInfo.expiry, expiry);
+    }
+
+    function test_setAssetRatesThenUpdateShareValue_fail_notAdminOrOwner() public {
+        address randomUser = makeAddr("randomUser");
+
+        vm.expectRevert(ComponentHelpersMixin.ComponentHelpersMixin__OnlyAdminOrOwner__Unauthorized.selector);
+
+        vm.prank(randomUser);
+        valuationHandler.setAssetRatesThenUpdateShareValue({
+            _rateInputs: new ValuationHandler.AssetRateInput[](0),
+            _untrackedPositionsValue: 0
+        });
+    }
+
+    function test_setAssetRatesThenUpdateShareValue_success() public {
+        // Define rates
+        address asset1 = makeAddr("rateAsset1");
+        address asset2 = makeAddr("rateAsset2");
+        uint128 rate1 = 5e18;
+        uint128 rate2 = 10e18;
+        uint40 expiry1 = 123;
+        uint40 expiry2 = 456;
+
+        ValuationHandler.AssetRateInput[] memory rateInputs = new ValuationHandler.AssetRateInput[](2);
+        rateInputs[0] = ValuationHandler.AssetRateInput({asset: asset1, rate: rate1, expiry: expiry1});
+        rateInputs[1] = ValuationHandler.AssetRateInput({asset: asset2, rate: rate2, expiry: expiry2});
+
+        // Define share value targets
+        int256 untrackedPositionsValue = 10e18;
+        uint256 sharesSupply = 2e18;
+        uint256 expectedShareValue = 5e18;
+
+        // Inflate shares supply
+        increaseSharesSupply({_shares: address(shares), _increaseAmount: sharesSupply});
+
+        // Set rates and update share value
+        vm.prank(admin);
+        valuationHandler.setAssetRatesThenUpdateShareValue({
+            _rateInputs: rateInputs,
+            _untrackedPositionsValue: untrackedPositionsValue
+        });
+
+        // Validate rates
+        ValuationHandler.AssetRateInfo memory rateInfo1 = valuationHandler.getAssetRateInfo({_asset: asset1});
+        ValuationHandler.AssetRateInfo memory rateInfo2 = valuationHandler.getAssetRateInfo({_asset: asset2});
+
+        assertEq(rateInfo1.rate, rate1);
+        assertEq(rateInfo1.expiry, expiry1);
+        assertEq(rateInfo2.rate, rate2);
+        assertEq(rateInfo2.expiry, expiry2);
+
+        // Validate share value
+        (uint256 actualShareValue, uint256 actualTimestamp) = valuationHandler.getSharePrice();
+        assertEq(actualShareValue, expectedShareValue);
+        assertEq(actualTimestamp, block.timestamp);
+    }
 
     function test_updateShareValue_fail_unauthorized() public {
         address randomUser = makeAddr("randomUser");

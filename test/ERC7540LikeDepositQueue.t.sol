@@ -408,18 +408,17 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         address request2Controller = makeAddr("controller2");
         address request3Controller = makeAddr("controller3");
 
-        uint256 request1AssetAmount = 3_000_000; // 3 units
-        uint256 request3AssetAmount = 15_000_000; // 15 units
+        uint256 request1AssetAmount = 5_000_000; // 5 units with 6 decimals
+        uint256 request3AssetAmount = 10_000_000; // 10 units with 6 decimals
 
-        uint256 valueAssetToDepositAssetRate = 3e8; // 1 valueAsset : 3 depositAsset
-        bool quotedInValueAsset = false;
-        uint256 sharePrice = 1e18; // Keep it simple with 1:1 share price
+        uint128 depositAssetToValueAssetRate = 4e18; // 1 depositAsset : 4 valueAsset
+        // sharePrice = 1e18; // Keep it simple with 1:1 share price
 
-        uint256 request1GrossSharesAmount = 1e18; // 1 unit
-        uint256 request3GrossSharesAmount = 5e18; // 5 units
+        uint256 request1GrossSharesAmount = 20e18; // 5 shares * 4 rate = 20 shares
+        uint256 request3GrossSharesAmount = 40e18; // 10 shares * 4 rate = 40 shares
 
-        uint256 request1FeeSharesAmount = 0.1e18; // 10% fee
-        uint256 request3FeeSharesAmount = 0.5e18; // 10% fee
+        uint256 request1FeeSharesAmount = 1e18; // 10% fee of 10 shares
+        uint256 request3FeeSharesAmount = 2e18; // 10% fee of 20 shares
 
         uint256 request1ExpectedSharesAmount = request1GrossSharesAmount - request1FeeSharesAmount;
         uint256 request3ExpectedSharesAmount = request3GrossSharesAmount - request3FeeSharesAmount;
@@ -430,16 +429,15 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
         vm.prank(admin);
         depositQueue.setAsset({_asset: asset});
 
-        // Create and set the oracle
-        uint8 oracleDecimals = 8;
-        MockChainlinkAggregator mockOracle = new MockChainlinkAggregator(oracleDecimals);
+        // Set the asset rate
         vm.prank(admin);
-        valuationHandler.setAssetOracle({
-            _asset: asset,
-            _oracle: address(mockOracle),
-            _quotedInValueAsset: quotedInValueAsset,
-            _timestampTolerance: 0
-        });
+        valuationHandler.setAssetRate(
+            ValuationHandler.AssetRateInput({
+                asset: asset,
+                rate: depositAssetToValueAssetRate,
+                expiry: uint40(block.timestamp + 1)
+            })
+        );
 
         // Mock and set a fee handler with different fee amounts for each request shares amount
         address mockFeeHandler = makeAddr("mockFeeHandler");
@@ -456,11 +454,6 @@ contract ERC7540LikeDepositQueueTest is TestHelpers {
 
         vm.prank(admin);
         shares.setFeeHandler(mockFeeHandler);
-
-        // Set rates
-        shares_mockSharePrice({_shares: address(shares), _sharePrice: sharePrice, _timestamp: block.timestamp});
-        mockOracle.setRate(valueAssetToDepositAssetRate);
-        mockOracle.setTimestamp(block.timestamp);
 
         // Seed controllers with asset, and grant allowance to the queue
         address[3] memory controllers = [request1Controller, request2Controller, request3Controller];
