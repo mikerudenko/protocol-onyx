@@ -167,9 +167,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
         Shares shares = Shares(__getShares());
         IFeeHandler feeHandler = IFeeHandler(shares.getFeeHandler());
         ValuationHandler valuationHandler = ValuationHandler(shares.getValuationHandler());
-
-        // Calculate the share price in the redeem asset
-        (uint256 sharePriceInRedeemAsset,) = valuationHandler.getSharePriceAsAssetAmount({_asset: asset()});
+        (uint256 sharePriceInValueAsset,) = valuationHandler.getSharePrice();
 
         // Fulfill requests
         for (uint256 i; i < _requestIds.length; i++) {
@@ -185,10 +183,11 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
                 : feeHandler.settleExitFeeGivenGrossShares({_grossSharesAmount: request.sharesAmount});
 
             // Calculate the asset amount due for remaining shares post-fee
-            uint256 userAssets = ValueHelpersLib.calcValueOfSharesAmount({
-                _valuePerShare: sharePriceInRedeemAsset,
+            uint256 valueDue = ValueHelpersLib.calcValueOfSharesAmount({
+                _valuePerShare: sharePriceInValueAsset,
                 _sharesAmount: request.sharesAmount - feeSharesAmount
             });
+            uint256 userAssets = valuationHandler.convertValueToAssetAmount({_value: valueDue, _asset: asset()});
             require(userAssets > 0, ERC7540LikeRedeemQueue__ExecuteRedeemRequests__ZeroAssets());
 
             // Burn gross shares held by this contract

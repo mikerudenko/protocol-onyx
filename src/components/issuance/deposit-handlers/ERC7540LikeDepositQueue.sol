@@ -224,9 +224,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
         Shares shares = Shares(__getShares());
         IFeeHandler feeHandler = IFeeHandler(shares.getFeeHandler());
         ValuationHandler valuationHandler = ValuationHandler(shares.getValuationHandler());
-
-        // Calculate the share price in the deposit asset
-        (uint256 sharePriceInDepositAsset,) = valuationHandler.getSharePriceAsAssetAmount({_asset: asset()});
+        (uint256 sharePriceInValueAsset,) = valuationHandler.getSharePrice();
 
         // Fulfill requests
         uint256 totalAssetsDeposited;
@@ -241,10 +239,10 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
             totalAssetsDeposited += request.assetAmount;
 
             // Calculate gross shares
-            uint256 grossSharesAmount = ValueHelpersLib.calcSharesAmountForValue({
-                _valuePerShare: sharePriceInDepositAsset,
-                _value: request.assetAmount
-            });
+            uint256 value =
+                valuationHandler.convertAssetAmountToValue({_asset: asset(), _assetAmount: request.assetAmount});
+            uint256 grossSharesAmount =
+                ValueHelpersLib.calcSharesAmountForValue({_valuePerShare: sharePriceInValueAsset, _value: value});
             // Settle any entrance fee
             uint256 feeSharesAmount = address(feeHandler) == address(0)
                 ? 0

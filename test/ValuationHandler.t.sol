@@ -227,34 +227,6 @@ contract ValuationHandlerTest is TestHelpers {
         assertEq(actualTimestamp, _valueTimestamp);
     }
 
-    function test_getSharePriceAsAssetAmount_success() public {
-        uint256 shareValue = 15e18; // 15 value units
-        uint128 rate = 3e18; // 1 asset : 3 valueAsset
-        uint8 assetDecimals = 6;
-        uint256 expectedAssetAmount = 5e6; // 5 units
-
-        // Warp to arbitrary time
-        vm.warp(12345);
-
-        // Set share value
-        uint256 shareValueTimestamp = block.timestamp - 11;
-        valuationHandler.harness_setLastShareValue({_shareValue: shareValue, _timestamp: shareValueTimestamp});
-
-        // Create asset
-        address asset = address(new MockERC20(assetDecimals));
-
-        // Set rate
-        vm.prank(admin);
-        valuationHandler.setAssetRate(
-            ValuationHandler.AssetRateInput({asset: asset, rate: rate, expiry: uint40(block.timestamp + 1)})
-        );
-
-        (uint256 actualAssetAmount, uint256 actualTimestamp) =
-            valuationHandler.getSharePriceAsAssetAmount({_asset: asset});
-        assertEq(actualAssetAmount, expectedAssetAmount);
-        assertEq(actualTimestamp, shareValueTimestamp);
-    }
-
     //==================================================================================================================
     // Share value updates
     //==================================================================================================================

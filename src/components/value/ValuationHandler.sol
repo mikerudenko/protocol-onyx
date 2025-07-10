@@ -178,18 +178,6 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
         price_ = value > 0 ? value : getDefaultSharePrice();
     }
 
-    /// @dev Returns _asset precision
-    function getSharePriceAsAssetAmount(address _asset)
-        public
-        view
-        returns (uint256 assetAmount_, uint256 timestamp_)
-    {
-        uint256 value;
-        (value, timestamp_) = getSharePrice();
-
-        assetAmount_ = convertValueToAssetAmount({_value: value, _asset: _asset});
-    }
-
     /// @dev Returns 18-decimal precision.
     /// Returns the actual value per share, not the price, which is returned by getSharePrice().
     function getShareValue() public view override returns (uint256 value_, uint256 timestamp_) {
