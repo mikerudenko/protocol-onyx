@@ -45,8 +45,9 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable LINEAR_CREDIT_DEBT_TRACKER_STORAGE_LOCATION =
-        StorageHelpersLib.deriveErc7201Location("LinearCreditDebtTracker");
+    bytes32 private constant LINEAR_CREDIT_DEBT_TRACKER_STORAGE_LOCATION =
+        0xf3c5e97ea0f49b3293469a3b3dca5503879e1f21da2c7f1e770e480cdbe07300;
+    string private constant LINEAR_CREDIT_DEBT_TRACKER_STORAGE_LOCATION_ID = "LinearCreditDebtTracker";
 
     /// @custom:storage-location erc7201:enzyme.LinearCreditDebtTracker
     /// @param lastItemId The id of the last item that was added
@@ -58,7 +59,7 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
         mapping(uint24 => Item) idToItem;
     }
 
-    function __getLinearCreditDebtTrackerStorage() private view returns (LinearCreditDebtTrackerStorage storage $) {
+    function __getLinearCreditDebtTrackerStorage() private pure returns (LinearCreditDebtTrackerStorage storage $) {
         bytes32 location = LINEAR_CREDIT_DEBT_TRACKER_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -84,6 +85,17 @@ contract LinearCreditDebtTracker is IPositionTracker, ComponentHelpersMixin {
     error LinearCreditDebtTracker__RemoveItem__DoesNotExist();
 
     error LinearCreditDebtTracker__UpdateSettledValue__DoesNotExist();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: LINEAR_CREDIT_DEBT_TRACKER_STORAGE_LOCATION,
+            _id: LINEAR_CREDIT_DEBT_TRACKER_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Item management (access: Shares admin or owner)

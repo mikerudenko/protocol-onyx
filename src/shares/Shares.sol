@@ -35,7 +35,9 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable SHARES_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("Shares");
+    bytes32 private constant SHARES_STORAGE_LOCATION =
+        0xbe724a55f726228f14b884d45d89388bc2a03793a0006937116ea1275a51fb00;
+    string private constant SHARES_STORAGE_LOCATION_ID = "Shares";
 
     /// @custom:storage-location erc7201:enzyme.Shares
     /// @param valueAsset A representation of the asset of account in which core values are reported (e.g., USD)
@@ -56,7 +58,7 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         mapping(address => bool) isAdmin;
     }
 
-    function __getSharesStorage() private view returns (SharesStorage storage $) {
+    function __getSharesStorage() private pure returns (SharesStorage storage $) {
         bytes32 location = SHARES_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -157,6 +159,17 @@ contract Shares is ERC20Upgradeable, Ownable2StepUpgradeable {
         require(isRedeemHandler(msg.sender), Shares__OnlyRedeemHandler__Unauthorized());
 
         _;
+    }
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: SHARES_STORAGE_LOCATION,
+            _id: SHARES_STORAGE_LOCATION_ID
+        });
     }
 
     //==================================================================================================================

@@ -30,7 +30,9 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable FEE_HANDLER_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("FeeHandler");
+    bytes32 private constant FEE_HANDLER_STORAGE_LOCATION =
+        0xf4d55ff99bda85c3aa25c0487eafd29734b8b8c0e94e473480bb8c25cf2aa300;
+    string private constant FEE_HANDLER_STORAGE_LOCATION_ID = "FeeHandler";
 
     /// @custom:storage-location erc7201:enzyme.FeeHandler
     /// @param managementFeeTracker IManagementFeeTracker contract address
@@ -58,7 +60,7 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
         mapping(address => uint256) userFeesOwed;
     }
 
-    function __getFeeHandlerStorage() private view returns (FeeHandlerStorage storage $) {
+    function __getFeeHandlerStorage() private pure returns (FeeHandlerStorage storage $) {
         bytes32 location = FEE_HANDLER_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -112,6 +114,17 @@ contract FeeHandler is IFeeHandler, ComponentHelpersMixin {
     error FeeHandler__SettleEntranceFeeGivenGrossShares__Unauthorized();
 
     error FeeHandler__SettleExitFeeGivenGrossShares__Unauthorized();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: FEE_HANDLER_STORAGE_LOCATION,
+            _id: FEE_HANDLER_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: Shares admin or owner)

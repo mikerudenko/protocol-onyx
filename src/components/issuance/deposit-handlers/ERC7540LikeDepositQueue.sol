@@ -56,7 +56,9 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable DEPOSIT_QUEUE_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("DepositQueue");
+    bytes32 private constant DEPOSIT_QUEUE_STORAGE_LOCATION =
+        0x37bf2d4e6d1debcc0d3cf847207ee0b86ff2e1e449075b8b8ded75967ce4f100;
+    string private constant DEPOSIT_QUEUE_STORAGE_LOCATION_ID = "DepositQueue";
 
     /// @custom:storage-location erc7201:enzyme.DepositQueue
     /// @param lastId Incrementing id for the most recent request (starts from `1`)
@@ -70,7 +72,7 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
         mapping(address => bool) isAllowedController;
     }
 
-    function __getDepositQueueStorage() private view returns (DepositQueueStorage storage $) {
+    function __getDepositQueueStorage() private pure returns (DepositQueueStorage storage $) {
         bytes32 location = DEPOSIT_QUEUE_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -106,6 +108,17 @@ contract ERC7540LikeDepositQueue is IERC7540LikeDepositHandler, ERC7540LikeIssua
     error ERC7540LikeDepositQueue__RequestDeposit__OwnerNotSender();
 
     error ERC7540LikeDepositQueue__RequestDeposit__ZeroAssets();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: DEPOSIT_QUEUE_STORAGE_LOCATION,
+            _id: DEPOSIT_QUEUE_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: admin or owner)

@@ -23,8 +23,9 @@ contract LimitedAccessLimitedCallForwarder is OpenAccessLimitedCallForwarder {
     // Storage
     //==================================================================================================================
 
-    bytes32 public immutable LIMITED_ACCESS_LIMITED_CALL_FORWARDER =
-        StorageHelpersLib.deriveErc7201Location("LimitedAccessLimitedCallForwarder");
+    bytes32 public constant LIMITED_ACCESS_LIMITED_CALL_FORWARDER =
+        0xc79bb6d1c38890e2019fbe15ffb6d894add943a40a60096f4039a45558b86300;
+    string public constant LIMITED_ACCESS_LIMITED_CALL_FORWARDER_ID = "LimitedAccessLimitedCallForwarder";
 
     /// @custom:storage-location erc7201:enzyme.LimitedAccessLimitedCallForwarder
     struct LimitedAccessLimitedCallForwarderStorage {
@@ -33,7 +34,7 @@ contract LimitedAccessLimitedCallForwarder is OpenAccessLimitedCallForwarder {
 
     function __getLimitedAccessLimitedCallForwarderStorage()
         internal
-        view
+        pure
         returns (LimitedAccessLimitedCallForwarderStorage storage $)
     {
         bytes32 location = LIMITED_ACCESS_LIMITED_CALL_FORWARDER;
@@ -59,6 +60,17 @@ contract LimitedAccessLimitedCallForwarder is OpenAccessLimitedCallForwarder {
     error LimitedAccessLimitedCallForwarder__ExecuteCall__UnauthorizedUser();
 
     error LimitedAccessLimitedCallForwarder__RemoveUser__NotAdded();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: LIMITED_ACCESS_LIMITED_CALL_FORWARDER,
+            _id: LIMITED_ACCESS_LIMITED_CALL_FORWARDER_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: admin or owner)

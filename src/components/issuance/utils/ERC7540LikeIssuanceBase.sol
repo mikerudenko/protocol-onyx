@@ -23,8 +23,9 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable ERC7540_LIKE_ISSUANCE_BASE_STORAGE_LOCATION =
-        StorageHelpersLib.deriveErc7201Location("ERC7540LikeIssuanceBase");
+    bytes32 private constant ERC7540_LIKE_ISSUANCE_BASE_STORAGE_LOCATION =
+        0xb6d07fd6f3a90998edd8cc9d24642317ef35db10e62ed4dbf526ac2cdd3b8d00;
+    string private constant ERC7540_LIKE_ISSUANCE_BASE_STORAGE_LOCATION_ID = "ERC7540LikeIssuanceBase";
 
     /// @custom:storage-location erc7201:enzyme.ERC7540LikeIssuanceBase
     /// @param asset The asset used for deposit/redeem/value
@@ -32,7 +33,7 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
         address asset;
     }
 
-    function __getERC7540LikeIssuanceBaseStorage() private view returns (ERC7540LikeIssuanceBaseStorage storage $) {
+    function __getERC7540LikeIssuanceBaseStorage() private pure returns (ERC7540LikeIssuanceBaseStorage storage $) {
         bytes32 location = ERC7540_LIKE_ISSUANCE_BASE_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -50,6 +51,17 @@ contract ERC7540LikeIssuanceBase is ComponentHelpersMixin {
     //==================================================================================================================
 
     error ERC7540LikeIssuanceBase__SetAsset__AlreadySet();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: ERC7540_LIKE_ISSUANCE_BASE_STORAGE_LOCATION,
+            _id: ERC7540_LIKE_ISSUANCE_BASE_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: admin or owner)

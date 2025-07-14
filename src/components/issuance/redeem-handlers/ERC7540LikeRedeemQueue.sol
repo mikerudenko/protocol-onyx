@@ -48,7 +48,9 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable REDEEM_QUEUE_STORAGE_LOCATION = StorageHelpersLib.deriveErc7201Location("RedeemQueue");
+    bytes32 private constant REDEEM_QUEUE_STORAGE_LOCATION =
+        0xbcb8ceea77a33ab0dcb8ebabd3acc0fa58368db4873ac11edccba71ee8fdbb00;
+    string private constant REDEEM_QUEUE_STORAGE_LOCATION_ID = "RedeemQueue";
 
     /// @custom:storage-location erc7201:enzyme.RedeemQueue
     /// @param lastId Incrementing id for the most recent request (starts from `1`)
@@ -60,7 +62,7 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
         mapping(uint256 => RedeemRequestInfo) idToRequest;
     }
 
-    function __getRedeemQueueStorage() private view returns (RedeemQueueStorage storage $) {
+    function __getRedeemQueueStorage() private pure returns (RedeemQueueStorage storage $) {
         bytes32 location = REDEEM_QUEUE_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -88,6 +90,17 @@ contract ERC7540LikeRedeemQueue is IERC7540LikeRedeemHandler, ERC7540LikeIssuanc
     error ERC7540LikeRedeemQueue__RequestRedeem__OwnerNotSender();
 
     error ERC7540LikeRedeemQueue__RequestRedeem__ZeroShares();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: REDEEM_QUEUE_STORAGE_LOCATION,
+            _id: REDEEM_QUEUE_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: admin or owner)

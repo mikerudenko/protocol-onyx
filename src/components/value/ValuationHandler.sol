@@ -58,8 +58,9 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     // Storage
     //==================================================================================================================
 
-    bytes32 public immutable VALUATION_HANDLER_STORAGE_LOCATION =
-        StorageHelpersLib.deriveErc7201Location("ValuationHandler");
+    bytes32 public constant VALUATION_HANDLER_STORAGE_LOCATION =
+        0x0373e40468ba9049d30c485103b40a820f4c179dde567c20624b82c9feb65b00;
+    string public constant VALUATION_HANDLER_STORAGE_LOCATION_ID = "ValuationHandler";
 
     /// @custom:storage-location erc7201:enzyme.ValuationHandler
     /// @param positionTrackers The set of IPositionTracker contracts queried to aggregate on-chain "tracked value"
@@ -73,7 +74,7 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
         uint40 lastShareValueTimestamp;
     }
 
-    function __getValuationHandlerStorage() internal view returns (ValuationHandlerStorage storage $) {
+    function __getValuationHandlerStorage() internal pure returns (ValuationHandlerStorage storage $) {
         bytes32 location = VALUATION_HANDLER_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -105,6 +106,17 @@ contract ValuationHandler is IValuationHandler, ComponentHelpersMixin {
     error ValuationHandler__ValidateRate__RateExpired();
 
     error ValuationHandler__ValidateRate__RateNotSet();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: VALUATION_HANDLER_STORAGE_LOCATION,
+            _id: VALUATION_HANDLER_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: admin or owner)

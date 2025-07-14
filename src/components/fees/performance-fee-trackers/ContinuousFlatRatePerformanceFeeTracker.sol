@@ -33,8 +33,9 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable PERFORMANCE_FEE_TRACKER_STORAGE_LOCATION =
-        StorageHelpersLib.deriveErc7201Location("PerformanceFeeTracker");
+    bytes32 private constant PERFORMANCE_FEE_TRACKER_STORAGE_LOCATION =
+        0x9b5db54aad07ab0d695a15cbe8f6baf30e20bec0d8b73b9bd4ded75e29fae800;
+    string private constant PERFORMANCE_FEE_TRACKER_STORAGE_LOCATION_ID = "PerformanceFeeTracker";
 
     /// @custom:storage-location erc7201:enzyme.PerformanceFeeTracker
     /// @param rate Performance fee rate as a percentage of share value increase
@@ -44,7 +45,7 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
         uint128 highWaterMark;
     }
 
-    function __getPerformanceFeeTrackerStorage() private view returns (PerformanceFeeTrackerStorage storage $) {
+    function __getPerformanceFeeTrackerStorage() private pure returns (PerformanceFeeTrackerStorage storage $) {
         bytes32 location = PERFORMANCE_FEE_TRACKER_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -68,6 +69,17 @@ contract ContinuousFlatRatePerformanceFeeTracker is IPerformanceFeeTracker, FeeT
     error ContinuousFlatRatePerformanceFeeTracker__SetRate__ExceedsMax();
 
     error ContinuousFlatRatePerformanceFeeTracker__SettlePerformanceFee__HighWaterMarkNotInitialized();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: PERFORMANCE_FEE_TRACKER_STORAGE_LOCATION,
+            _id: PERFORMANCE_FEE_TRACKER_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: Shares admin or owner)

@@ -28,8 +28,9 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable MANAGEMENT_FEE_TRACKER_STORAGE_LOCATION =
-        StorageHelpersLib.deriveErc7201Location("ManagementFeeTracker");
+    bytes32 private constant MANAGEMENT_FEE_TRACKER_STORAGE_LOCATION =
+        0x25008e61d6a33ea3313338886e9ba1cacec26ac79d05629f9df4b5d62fb2ee00;
+    string private constant MANAGEMENT_FEE_TRACKER_STORAGE_LOCATION_ID = "ManagementFeeTracker";
 
     /// @custom:storage-location erc7201:enzyme.ManagementFeeTracker
     /// @param rate Management fee rate as an annualized percentage of net value
@@ -39,7 +40,7 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
         uint64 lastSettled;
     }
 
-    function __getManagementFeeTrackerStorage() private view returns (ManagementFeeTrackerStorage storage $) {
+    function __getManagementFeeTrackerStorage() private pure returns (ManagementFeeTrackerStorage storage $) {
         bytes32 location = MANAGEMENT_FEE_TRACKER_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -61,6 +62,17 @@ contract ContinuousFlatRateManagementFeeTracker is IManagementFeeTracker, FeeTra
     error ContinuousFlatRateManagementFeeTracker__SetRate__ExceedsMax();
 
     error ContinuousFlatRateManagementFeeTracker__SettleManagementFee__LastSettledNotInitialized();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: MANAGEMENT_FEE_TRACKER_STORAGE_LOCATION,
+            _id: MANAGEMENT_FEE_TRACKER_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: Shares admin or owner)

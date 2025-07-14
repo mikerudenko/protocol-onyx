@@ -31,8 +31,9 @@ contract AccountERC20Tracker is IPositionTracker, ComponentHelpersMixin {
     // Storage
     //==================================================================================================================
 
-    bytes32 private immutable ACCOUNT_ERC20_TRACKER_STORAGE_LOCATION =
-        StorageHelpersLib.deriveErc7201Location("AccountERC20Tracker");
+    bytes32 private constant ACCOUNT_ERC20_TRACKER_STORAGE_LOCATION =
+        0x85378e297d6c8e578e867cf1e0cdf12245bc85fa8c2e83002e863bfec07d5e00;
+    string private constant ACCOUNT_ERC20_TRACKER_STORAGE_LOCATION_ID = "AccountERC20Tracker";
 
     /// @custom:storage-location erc7201:enzyme.AccountERC20Tracker
     /// @param assets A set of ERC20 token addresses to track
@@ -42,7 +43,7 @@ contract AccountERC20Tracker is IPositionTracker, ComponentHelpersMixin {
         address account;
     }
 
-    function __getAccountERC20TrackerStorage() private view returns (AccountERC20TrackerStorage storage $) {
+    function __getAccountERC20TrackerStorage() private pure returns (AccountERC20TrackerStorage storage $) {
         bytes32 location = ACCOUNT_ERC20_TRACKER_STORAGE_LOCATION;
         assembly {
             $.slot := location
@@ -72,6 +73,17 @@ contract AccountERC20Tracker is IPositionTracker, ComponentHelpersMixin {
     error AccountERC20Tracker__GetPositionValue__NotInitialized();
 
     error AccountERC20Tracker__RemoveAsset__NotAdded();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: ACCOUNT_ERC20_TRACKER_STORAGE_LOCATION,
+            _id: ACCOUNT_ERC20_TRACKER_STORAGE_LOCATION_ID
+        });
+    }
 
     //==================================================================================================================
     // Initialize

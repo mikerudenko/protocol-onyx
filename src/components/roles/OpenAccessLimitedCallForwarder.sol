@@ -34,8 +34,9 @@ contract OpenAccessLimitedCallForwarder is ComponentHelpersMixin {
     // Storage
     //==================================================================================================================
 
-    bytes32 public immutable OPEN_ACCESS_LIMITED_CALL_FORWARDER =
-        StorageHelpersLib.deriveErc7201Location("OpenAccessLimitedCallForwarder");
+    bytes32 public constant OPEN_ACCESS_LIMITED_CALL_FORWARDER =
+        0xd8629d0b328b818d94709c41621ad85f1c91d389e473b12a0b9716c4a9e55400;
+    string public constant OPEN_ACCESS_LIMITED_CALL_FORWARDER_ID = "OpenAccessLimitedCallForwarder";
 
     /// @custom:storage-location erc7201:enzyme.OpenAccessLimitedCallForwarder
     struct OpenAccessLimitedCallForwarderStorage {
@@ -44,7 +45,7 @@ contract OpenAccessLimitedCallForwarder is ComponentHelpersMixin {
 
     function __getOpenAccessLimitedCallForwarderStorage()
         internal
-        view
+        pure
         returns (OpenAccessLimitedCallForwarderStorage storage $)
     {
         bytes32 location = OPEN_ACCESS_LIMITED_CALL_FORWARDER;
@@ -72,6 +73,17 @@ contract OpenAccessLimitedCallForwarder is ComponentHelpersMixin {
     error OpenAccessLimitedCallForwarder__ExecuteCall__UnauthorizedCall();
 
     error OpenAccessLimitedCallForwarder__RemoveCall__NotAdded();
+
+    //==================================================================================================================
+    // Constructor
+    //==================================================================================================================
+
+    constructor() {
+        StorageHelpersLib.verifyErc7201LocationForId({
+            _location: OPEN_ACCESS_LIMITED_CALL_FORWARDER,
+            _id: OPEN_ACCESS_LIMITED_CALL_FORWARDER_ID
+        });
+    }
 
     //==================================================================================================================
     // Config (access: admin or owner)
