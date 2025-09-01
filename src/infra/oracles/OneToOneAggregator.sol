@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 /*
-    This file is part of the Enzyme Protocol.
+    This file is part of the Onyx Protocol.
 
     (c) Enzyme Foundation <security@enzyme.finance>
 
