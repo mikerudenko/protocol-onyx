@@ -33,3 +33,13 @@ forge build
 ```
 forge test
 ```
+
+## Licensing
+
+- Source-available under Business Source License 1.1 (BUSL-1.1).
+- See [LICENSES/BUSL-1.1](LICENSES/BUSL-1.1) for terms and change date.
+
+SPDX identifiers:
+
+- All first-party files: `BUSL-1.1`
+- Vendored third-party files retain original identifiers (e.g., `MIT`).
