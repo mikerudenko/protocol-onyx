@@ -14,6 +14,7 @@ pragma solidity 0.8.28;
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import {GlobalOwnable} from "src/global/utils/GlobalOwnable.sol";
+import {DeploymentHelpersLib} from "src/utils/DeploymentHelpersLib.sol";
 
 /// @title BeaconFactory Contract
 /// @author Enzyme Foundation <security@enzyme.finance>
@@ -25,6 +26,7 @@ contract BeaconFactory is IBeacon, GlobalOwnable {
 
     address public override implementation;
     mapping(address _who => bool) public isInstance;
+    uint256 internal nonce;
 
     //==================================================================================================================
     // Events
@@ -55,7 +57,10 @@ contract BeaconFactory is IBeacon, GlobalOwnable {
     //==================================================================================================================
 
     function deployProxy(bytes calldata _initData) external returns (address proxy_) {
-        proxy_ = address(new BeaconProxy({beacon: address(this), data: _initData}));
+        bytes memory bytecode = abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(address(this), _initData));
+
+        proxy_ = DeploymentHelpersLib.deployAtUniqueAddress({_bytecode: bytecode, _nonce: nonce++});
+
         isInstance[proxy_] = true;
 
         emit ProxyDeployed({proxy: proxy_});
