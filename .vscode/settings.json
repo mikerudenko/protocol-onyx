@@ -6,5 +6,10 @@
   "solidity.formatter": "forge",
   "[solidity]": {
     "editor.defaultFormatter": "NomicFoundation.hardhat-solidity"
-  }
+  },
+  "recon.defaultFuzzer": "echidna",
+  "cSpell.words": [
+    "Hevm",
+    "IERC"
+  ]
 }

@@ -1,0 +1,112 @@
+{
+  "out/Shares.sol/Shares.json": {
+    "functions": [
+      {
+        "signature": "acceptOwnership()",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "addAdmin(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "addDepositHandler(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "addRedeemHandler(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "approve(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "authTransfer(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "authTransferFrom(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "burnFor(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "init(address,string,string,bytes32)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "mintFor(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "removeAdmin(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "removeDepositHandler(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "removeRedeemHandler(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "renounceOwnership()",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setFeeHandler(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setSharesTransferValidator(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "setValuationHandler(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transfer(address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transferFrom(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "transferOwnership(address)",
+        "actor": "actor",
+        "mode": "normal"
+      },
+      {
+        "signature": "withdrawAssetTo(address,address,uint256)",
+        "actor": "actor",
+        "mode": "normal"
+      }
+    ],
+    "separated": true
+  }
+}

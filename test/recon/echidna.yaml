@@ -1,0 +1,6 @@
+# Echidna configuration for Onyx Protocol invariant testing
+testMode: assertion
+testLimit: 1000000
+timeout: 3600
+seqLen: 100
+workers: 8
